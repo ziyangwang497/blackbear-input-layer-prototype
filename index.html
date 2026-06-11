@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Adaptive Input Layer for SoW Generation</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- ============================================================= -->
+  <!-- INTRODUCTION PANEL                                             -->
+  <!-- ============================================================= -->
+  <header class="site-header">
+    <div class="container">
+      <p class="eyebrow">Bachelor thesis artifact · AI4Business · Blackbear</p>
+      <h1>Adaptive Input Layer for Statement&nbsp;of&nbsp;Work Generation</h1>
+      <p class="lead">
+        A transparent, <strong>rule-based adaptive input-layer model</strong>.
+        It screens the <strong>maturity</strong> of an assignment, requests
+        <strong>maturity-specific information</strong>, asks
+        <strong>adaptive follow-up questions</strong>, runs
+        <strong>completeness and consistency checks</strong>, and produces a
+        <strong>structured input package</strong> for a later generation layer.
+      </p>
+      <div class="callout">
+        <strong>This is an input-layer model, not a SoW generator.</strong>
+        It does not write a Statement of Work. It improves how assignment
+        information is collected, classified, clarified, checked, and
+        structured <em>before</em> generation. Everything runs locally in your
+        browser — no backend, database, API key, confidential data, or real
+        Blackbear documents are used.
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- ========================================================= -->
+    <!-- PROTOTYPE MODEL LOGIC (the adaptive flow, shown up front)  -->
+    <!-- ========================================================= -->
+    <section class="card" id="model-logic">
+      <h2><span class="step-num">▣</span> Prototype model logic</h2>
+      <p class="muted">
+        The artifact follows one rule-based adaptive flow. Maturity is detected
+        from the assignment information — it is never chosen by hand.
+      </p>
+      <ol class="flow">
+        <li class="flow-step"><span class="flow-i">1</span>Initial assignment input</li>
+        <li class="flow-step"><span class="flow-i">2</span>Rule-based maturity screening</li>
+        <li class="flow-step"><span class="flow-i">3</span>Maturity-specific requirements &amp; follow-up questions</li>
+        <li class="flow-step"><span class="flow-i">4</span>Completeness, relevance &amp; consistency checks</li>
+        <li class="flow-step final"><span class="flow-i">5</span>Structured input package</li>
+      </ol>
+      <p class="muted" style="margin-top:12px">
+        It is an <strong>improvement loop</strong>: the checks (Step 4) diagnose
+        the input, you improve the fields in Step 3 and rerun, and the checks and
+        package update.
+      </p>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- DEMO CASES ONLY                                            -->
+    <!-- ========================================================= -->
+    <section class="card" id="examples">
+      <h2><span class="step-num">◇</span> Demo cases only</h2>
+      <div class="note-box">
+        These buttons <strong>only load fictional examples</strong> to illustrate
+        the model. <strong>They do not let you pick a maturity level.</strong>
+        In the real workflow you simply fill in the Initial intake below, and the
+        prototype <em>classifies</em> the maturity from the information you
+        provide.
+      </div>
+      <div class="example-buttons" id="example-buttons">
+        <!-- Demo buttons injected by script.js -->
+      </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- 1. INITIAL ASSIGNMENT INPUT (basic, deliberately simple)   -->
+    <!-- ========================================================= -->
+    <section class="card" id="intake">
+      <h2><span class="step-num">1</span> Initial intake</h2>
+      <p class="muted">
+        Start simple. Describe the assignment and a few basics — you do
+        <strong>not</strong> need to fill a long form here. After screening, the
+        prototype will ask only for the information that matters for your
+        assignment's maturity level.
+      </p>
+
+      <label class="field-label" for="initialDescription">Initial assignment description</label>
+      <textarea id="initialDescription" rows="3"
+        placeholder="e.g. We want to explore how AI could improve our intake process..."></textarea>
+
+      <div class="basic-grid">
+        <div>
+          <label class="field-label" for="objective">Objective</label>
+          <textarea id="objective" rows="2"></textarea>
+        </div>
+        <div>
+          <label class="field-label" for="problem">Problem statement / business context</label>
+          <textarea id="problem" rows="2"></textarea>
+        </div>
+        <div>
+          <label class="field-label" for="companyContext">Organisation / context</label>
+          <textarea id="companyContext" rows="2"></textarea>
+        </div>
+        <div>
+          <label class="field-label" for="userRole">Your role</label>
+          <textarea id="userRole" rows="2"></textarea>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="analyze-btn" class="btn btn-primary" type="button">
+          Screen maturity &amp; analyze
+        </button>
+        <button id="reset-btn" class="btn btn-ghost" type="button">Clear all</button>
+      </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- RESULTS (hidden until screening runs)                      -->
+    <!-- ========================================================= -->
+    <div id="results" hidden>
+
+      <!-- METRICS PANEL -->
+      <section class="card metrics-panel" id="metrics">
+        <h2><span class="step-num">★</span> Prototype metrics</h2>
+        <div class="metrics-grid" id="metrics-grid"></div>
+      </section>
+
+      <!-- 2. RULE-BASED MATURITY SCREENING -->
+      <section class="card" id="maturity">
+        <h2><span class="step-num">2</span> Rule-based maturity screening</h2>
+        <div id="maturity-summary"></div>
+        <h3>Why this level?</h3>
+        <p id="maturity-reason" class="muted"></p>
+        <h3>Indicators that contributed</h3>
+        <div id="maturity-indicators" class="indicator-list"></div>
+      </section>
+
+      <!-- 3. MATURITY-SPECIFIC INPUT REQUIREMENTS — the place to IMPROVE input -->
+      <section class="card" id="requirements">
+        <h2><span class="step-num">3</span> Maturity-specific input requirements</h2>
+        <p class="muted" id="req-explanation"></p>
+        <p class="muted"><strong>This is where you improve the input.</strong>
+          Fill or strengthen the fields below, then press “Update analysis”.</p>
+        <div id="req-fields"></div>
+
+        <!-- Suggested follow-up questions: short guidance for improving the fields above -->
+        <h3>Suggested follow-up questions</h3>
+        <p class="muted" id="followup-intro"></p>
+        <ol id="followup-list" class="question-list"></ol>
+
+        <div class="actions">
+          <button id="rerun-btn" class="btn btn-secondary" type="button">
+            Update analysis with this information
+          </button>
+        </div>
+      </section>
+
+      <!-- 4. COMPLETENESS, RELEVANCE & CONSISTENCY CHECKS (diagnostic only) -->
+      <section class="card" id="checks">
+        <h2><span class="step-num">4</span> Completeness, relevance &amp; consistency checks</h2>
+        <div class="note-box">
+          These checks <strong>diagnose</strong> the current input quality. To improve
+          the result, update the maturity-specific fields in <strong>Step 3</strong> and
+          rerun the analysis.
+        </div>
+        <p class="muted">
+          Assessed with simple local rules along the thesis dimensions —
+          <strong>completeness</strong>, <strong>contextual relevance</strong>, and
+          <strong>consistency</strong>. This is not a truth check: it only tests
+          whether the input is meaningful, category-relevant, and useful for
+          structuring the assignment.
+        </p>
+
+        <h3>Completeness (evaluated against this maturity level)</h3>
+        <div class="progress-wrap">
+          <div class="progress-bar"><div id="completeness-fill" class="progress-fill"></div></div>
+          <span id="completeness-label" class="progress-label"></span>
+        </div>
+
+        <h3>Missing information</h3>
+        <ul id="missing-list" class="status-list"></ul>
+
+        <h3>Weak information</h3>
+        <ul id="weak-list" class="status-list"></ul>
+
+        <h3>Invalid / meaningless information</h3>
+        <ul id="invalid-list" class="status-list"></ul>
+
+        <h3>Low contextual relevance</h3>
+        <ul id="lowrel-list" class="status-list"></ul>
+
+        <h3>Consistency warnings</h3>
+        <ul id="warning-list" class="status-list"></ul>
+      </section>
+
+      <!-- 5. STRUCTURED INPUT PACKAGE FOR LATER SoW GENERATION -->
+      <section class="card package-card" id="package">
+        <h2><span class="step-num">5</span> Structured input package for later SoW generation</h2>
+        <p class="muted">
+          The hand-off for a later SoW generation layer — <strong>not a finished
+          Statement of Work.</strong>
+        </p>
+        <div id="package-output" class="package"></div>
+        <div class="actions">
+          <button id="copy-btn" class="btn btn-secondary" type="button">Copy as text</button>
+          <button id="download-btn" class="btn btn-secondary" type="button">Download JSON</button>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p class="muted">
+        Rule-based thesis prototype. Uses only generalized, anonymized patterns
+        and fictional examples — no confidential documents, no machine learning,
+        no production data.
+      </p>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
