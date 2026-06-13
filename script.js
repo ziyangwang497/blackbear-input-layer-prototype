@@ -70,8 +70,11 @@ const FIELDS = {
 };
 const ALL_FIELD_IDS = Object.keys(FIELDS);
 
-/* Fields shown in the simple Initial intake form. */
-const BASIC_FIELD_IDS = ["initialDescription", "objective", "problem", "companyContext", "userRole"];
+/* Fields captured at the simple entry point: one main description box plus an
+ * optional, collapsed context block (organisation, role, constraints/background).
+ * Everything else — including objective, problem, scope, deliverables — is asked
+ * for adaptively in Step 3 only after maturity screening. */
+const BASIC_FIELD_IDS = ["initialDescription", "companyContext", "userRole", "limitations"];
 
 /* Input categories (the unit completeness scoring and questions use).
  * `group` records which RELEVANT INPUT CATEGORY family it belongs to —
@@ -98,6 +101,7 @@ const CATEGORIES = {
    * week, cost). Weight 2 so missing budget lowers the score moderately,
    * not punitively. */
   budget:           { label: "Budget / workload",         group: "context",    fields: ["budget", "workload"],                               weight: 2, question: "What budget, rate, or workload (e.g. hours per week) is expected?" },
+  resources:        { label: "Required roles / resources / access", group: "context", fields: ["requiredRoles", "requiredExpertise", "tools", "documents"], weight: 2, question: "Which roles, expertise, tools, data, or access are required?" },
 };
 
 /* MATURITY-SPECIFIC input requirements (what is evaluated per level). */
@@ -111,10 +115,51 @@ const MATURITY_REQUIREMENTS = {
     categories: ["objective", "scope", "deliverables", "timeline", "budget", "constraints", "stakeholders", "success"],
   },
   high: {
-    note: "Well-defined assignments are evaluated on precise deliverables, definition of done, dependencies, out-of-scope activities, budget/workload, acceptance criteria, validation logic, and approval owner.",
-    categories: ["deliverables", "definitionOfDone", "dependencies", "outOfScope", "budget", "acceptance", "validation", "approvalOwner"],
+    note: "Well-defined assignments are evaluated on precise deliverables, definition of done, dependencies, out-of-scope activities, budget/workload, required roles/resources, acceptance criteria, validation logic, and approval owner.",
+    categories: ["deliverables", "definitionOfDone", "dependencies", "outOfScope", "budget", "resources", "acceptance", "validation", "approvalOwner"],
   },
 };
+
+/* =================================================================
+ * THESIS TAXONOMY (11 fixed categories) — used by the evaluation panel.
+ * -----------------------------------------------------------------
+ * Independent of the maturity-specific completeness above. Each category
+ * is scored automatically (Captured = 1, Weak = 0.5, Missing = 0) by the
+ * rule-based heuristic in scoreTaxonomyCategory(): word count + vague
+ * wording + a category-specific "concrete signal" regex. `needsConcrete`
+ * categories (timeline, budget, success) require a concrete number/date/
+ * measure to count as Captured. `match` terms link a category to related
+ * consistency warnings for the scoring table.
+ * ================================================================= */
+const WEAK_PHRASES = [
+  "soon", "later", "to be discussed", "to be decided", "to be defined",
+  "to be determined", "tba", "as needed", "as required", "flexible",
+  "ongoing", "when possible", "if needed", "to follow",
+];
+const TAXONOMY = [
+  { key: "objective", label: "Objective / purpose", fields: ["objective"], needsConcrete: false,
+    concrete: /\d/, question: "State the core objective in one specific sentence (what outcome, for whom).", match: ["objective"] },
+  { key: "problem", label: "Problem statement / business context", fields: ["problem"], needsConcrete: false,
+    concrete: /\d|manual|slow|error|scattered|inefficient|cost|delay|bottleneck|compliance|lack of/, question: "What problem or business need drives this assignment, and why now?", match: ["problem", "context"] },
+  { key: "scope", label: "Scope / included activities", fields: ["scope", "includedActivities"], needsConcrete: false,
+    concrete: /[,;•\n]|process|analy|build|design|implement|integrat|develop|configur|visuali|migrat|extract/, question: "What is included in scope, and what are the main activities?", match: ["scope"] },
+  { key: "deliverables", label: "Deliverables / definition of done", fields: ["deliverables", "definitionOfDone"], needsConcrete: false,
+    concrete: /[,;•\n]|report|dashboard|tool|module|document|plan|model|prototype|guide|system|analysis|template/, question: "Which concrete deliverables are expected, and what defines 'done'?", match: ["deliverable", "definition of done", "milestone"] },
+  { key: "timeline", label: "Timeline / duration / milestones", fields: ["timeline", "milestones"], needsConcrete: true,
+    concrete: /\d|week|month|day|quarter|q[1-4]|year|deadline|milestone/, question: "What is the expected timeline, duration, or key milestones (with dates)?", match: ["timeline"] },
+  { key: "budget", label: "Budget expectations", fields: ["budget", "workload"], needsConcrete: true,
+    concrete: /\d|[€$£]|eur|usd|\bk\b|hour|fte|per week|day rate/, question: "What budget, rate, or workload (e.g. hours per week) is expected?", match: ["budget", "workload"] },
+  { key: "roles", label: "Required roles / expertise", fields: ["requiredRoles", "requiredExpertise"], needsConcrete: false,
+    concrete: /engineer|developer|analyst|manager|designer|consultant|specialist|lead|architect|expert|scientist|officer|coordinator|owner|trainer|researcher|senior|junior/, question: "Which roles or expertise (and seniority) are required?", match: ["role", "expertise", "responsibilit"] },
+  { key: "resourcesAccess", label: "Resources / access / materials", fields: ["tools", "documents"], needsConcrete: false,
+    concrete: /api|system|dataset|\bdata\b|access|tool|document|platform|database|\bfile|software|repository|environment|material|template|licen/, question: "What tools, systems, data, access, or materials are available or required?", match: ["resource", "access"] },
+  { key: "context", label: "Company / industry / team context", fields: ["companyContext", "industryContext", "teamContext", "userRole"], needsConcrete: false,
+    concrete: /\d|industry|sector|company|team|department|organi[sz]ation|saas|manufactur|retail|healthcare|finance|public|government|b2b|logistics|education/, question: "What company, industry, or team context is relevant?", match: ["context", "stakeholder"] },
+  { key: "outOfScope", label: "Out-of-scope / limitations / dependencies", fields: ["outOfScope", "limitations", "dependencies", "assumptions", "risks"], needsConcrete: false,
+    concrete: /[,;•\n]|not includ|out of scope|exclud|assum|depend|limitation|constraint|\brisk|without/, question: "What is explicitly out of scope, and what limitations or dependencies apply?", match: ["out-of-scope", "out of scope", "conflict", "dependenc", "limitation"] },
+  { key: "success", label: "Success criteria / validation logic", fields: ["successCriteria", "acceptanceCriteria", "validationLogic"], needsConcrete: true,
+    concrete: /\d|%|kpi|metric|target|\brate\b|accuracy|reduce|increase|fewer|within|measur|criteri|accept|validat|sign/, question: "How will success be measured and validated (measurable acceptance criteria)?", match: ["success", "measurable", "not aligned", "acceptance", "validation"] },
+];
 
 /* CONTEXTUAL RELEVANCE signals (thesis dimension). These are checked for
  * ALL maturity levels: is the captured information useful for the
@@ -552,7 +597,149 @@ function checkConsistency() {
     push("Milestones without clear deliverables", "Milestones are mentioned, but the deliverables tied to them are not clearly defined.");
   if (tooManyRoles())
     push("Role requirements combine many responsibilities", "The required roles mix several unrelated responsibilities. Confirm this is realistic for one engagement.");
+  // Senior / expert expertise requested but budget is missing or vague.
+  if (/\b(senior|expert|lead|architect|principal|years of experience)\b/.test((state.requiredRoles + " " + state.requiredExpertise).toLowerCase())
+      && bestQuality(["budget", "workload"]) !== "strong")
+    push("Senior expertise required but budget unclear", "Senior or expert profiles are requested, but budget/workload is missing or vague. Confirm the budget supports the seniority required.");
+  // Success criteria include a number/target but no rationale or explanation.
+  const successTxt = (state.successCriteria + " " + state.acceptanceCriteria).toLowerCase();
+  if (/\d|%/.test(successTxt) && meaningfulTokens(successTxt).length < 4)
+    push("Success target without rationale", "The success criteria include a number or target but little explanation of how or why it is measured. Add the rationale behind the target.");
+  // Scope is defined but out-of-scope boundaries are not stated.
+  if (catQuality("scope") === "strong" && bestQuality(["outOfScope"]) === "missing")
+    push("Scope defined but out-of-scope missing", "The scope is defined, but what is explicitly out of scope is not stated. Add out-of-scope boundaries to prevent scope creep.");
   return warnings;
+}
+
+/* =================================================================
+ * 6b. TAXONOMY-BASED EVALUATION METRICS (thesis Chapters 5–6)
+ * -----------------------------------------------------------------
+ * Scores the 11 fixed taxonomy categories automatically and derives the
+ * evaluation metrics. All rule-based and transparent — no AI/LLM.
+ * Consistency warnings are counted SEPARATELY (not in the completeness
+ * score). Manual reference issues never affect the prototype's scoring.
+ * ================================================================= */
+
+/* --- Strict capture signals for taxonomy scoring -----------------
+ * A category is Captured ONLY when it is specific, usable, and detailed
+ * enough to support SoW generation — related text alone is not enough.
+ * Each detector below is a transparent rule, no AI. */
+const TX_NUM = "(?:\\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)";
+const TX_DUR = new RegExp(`\\b${TX_NUM}\\s*[- ]?(day|days|week|weeks|month|months|year|years)\\b`); // "10 weeks", "ten-week"
+const TX_DATE = /\b\d{1,2}[\/.\-]\d{1,2}([\/.\-]\d{2,4})?\b|\b(19|20)\d{2}\b/;                       // 12-05-2026, 2026
+const TX_MONEY = /[€$£]\s?\d|\b\d+([.,]\d+)?\s*(k|m|eur|euro|euros|usd|dollar|dollars)\b|\b\d{3,}\b/; // €40,000 / 50000 / 40k
+const TX_WORKLOAD = /\b\d+\s*(hour|hours|hrs|fte)\b|\bfte\b/;                                        // 20 hours/week, 0.5 FTE
+const TX_MEASURABLE = /\d|%|\b(kpi|metric|target|rate|accuracy|reduce|increase|fewer|within|measur|benchmark|threshold)\b/;
+const TX_SENIORITY = /\b(senior|junior|lead|principal|expert|experienced|years|skill|skills|proficient|knowledge|specialis|certified|domain)\b/;
+const TX_ROLE = /engineer|developer|analyst|manager|designer|consultant|specialist|lead|architect|expert|scientist|officer|coordinator|owner|trainer|researcher/;
+const TX_SCOPE_ACT = /[,;•\n]|process|analy|build|design|implement|integrat|develop|configur|visuali|migrat|extract|automat|create|deliver|review|coordinat|prepar|conduct/;
+const TX_RESOURCE = /api|system|dataset|\bdata\b|access|tool|document|platform|database|\bfile|software|repository|environment|material|template|licen|credential|stakeholder/;
+const TX_CONTEXT = /industry|sector|company|team|department|organi[sz]ation|saas|manufactur|retail|healthcare|finance|public|government|b2b|logistics|education|startup|enterprise|municipal/;
+const TX_OOS = /not includ|out of scope|exclud|without|depend|limitation|constraint|\brisk|assum/;
+
+/* Category-specific reasons (no repeated generic text). */
+const TAX_REASONS = {
+  objective:       { c: "A specific objective with a clear intended outcome is provided.", w: "The objective is stated but too brief or generic to be usable.", m: "No objective or purpose is stated." },
+  problem:         { c: "The problem / business context is described specifically.", w: "A problem is mentioned but lacks detail or context.", m: "No problem statement or business context is provided." },
+  scope:           { c: "Scope includes specific activities.", w: "Scope is mentioned but the activities are not specific enough.", m: "No scope or included activities are described." },
+  deliverables:    { c: "Concrete deliverables and/or a clear definition of done are provided.", w: "Deliverables are mentioned but the definition of done is incomplete.", m: "No deliverables or definition of done are provided." },
+  timeline:        { c: "A concrete project duration, deadline, or dated milestones are provided.", w: "Timeline is mentioned but lacks a concrete duration, deadline, or milestones.", m: "No timeline, duration, or milestones are provided." },
+  budget:          { c: "A concrete budget amount/range or numeric workload is provided.", w: "Budget is mentioned but not specified.", m: "No budget or workload expectation is provided." },
+  roles:           { c: "Roles are specified with skills, seniority, or concrete tasks.", w: "A role is named but lacks skills, seniority, or tasks.", m: "No required roles or expertise are specified." },
+  resourcesAccess: { c: "Specific systems, data, tools, access, or materials are named.", w: "Resources are implied but not explicitly specified.", m: "No systems, data, tools, access, or materials are specified." },
+  context:         { c: "Relevant company, industry, or team context is provided.", w: "Some context is given but it is generic.", m: "No company, industry, or team context is provided." },
+  outOfScope:      { c: "Out-of-scope boundaries and/or key dependencies are explicitly stated.", w: "Limitations or dependencies are hinted at but boundaries are not explicit.", m: "No out-of-scope boundaries, limitations, or dependencies are stated." },
+  success:         { c: "Measurable, verifiable success / acceptance criteria are provided.", wMeasurable: "A target is mentioned but the rationale or validation logic is unclear.", wNonMeasurable: "Success criteria are mentioned but not measurable.", m: "No success criteria or validation logic are provided." },
+};
+
+function lineItemCount(s) {
+  return (s || "").split(/\n|;|•|·|^\s*[-*]/m).map((x) => x.trim()).filter(Boolean).length;
+}
+/* Pre-compute the per-category signals once. */
+function buildTaxCtx(text, lower) {
+  const present = (id) => ["weak", "strong"].includes(fieldStatus(state[id]));
+  return {
+    lower,
+    meaningful: meaningfulTokens(text).length,
+    vague: WEAK_PHRASES.some((p) => lower.includes(p)) || VAGUE_MARKERS.some((m) => lower.includes(m)),
+    dodStrong: fieldStatus(state.definitionOfDone) === "strong",
+    multiOut: lineItemCount(state.deliverables),
+    hasRole: TX_ROLE.test((state.requiredRoles + " " + state.requiredExpertise).toLowerCase()),
+    roleCount: state.requiredRoles.split(/[,\n]/).map((s) => s.trim()).filter(Boolean).length,
+    hasExpertise: present("requiredExpertise"),
+    senioritySkill: TX_SENIORITY.test(lower),
+    oosStrong: fieldStatus(state.outOfScope) === "strong",
+    constraintCount: ["limitations", "dependencies", "assumptions", "risks"].filter(present).length,
+    measurable: TX_MEASURABLE.test(lower),
+    validationStrong: fieldStatus(state.validationLogic) === "strong",
+    acceptanceStrong: fieldStatus(state.acceptanceCriteria) === "strong",
+  };
+}
+/* The strict Captured test, per category. */
+function capturedFor(key, c) {
+  switch (key) {
+    case "objective": return c.meaningful >= 4;
+    case "problem": return c.meaningful >= 4;
+    case "scope": return c.meaningful >= 5 && TX_SCOPE_ACT.test(c.lower);
+    case "deliverables": return c.dodStrong || c.multiOut >= 3;
+    case "timeline": return TX_DUR.test(c.lower) || TX_DATE.test(c.lower);
+    case "budget": return TX_MONEY.test(c.lower) || TX_WORKLOAD.test(c.lower);
+    case "roles": return c.hasRole && (c.senioritySkill || c.hasExpertise || c.roleCount >= 2 || c.meaningful >= 6);
+    case "resourcesAccess": return c.meaningful >= 3 && TX_RESOURCE.test(c.lower);
+    case "context": return c.meaningful >= 4 && TX_CONTEXT.test(c.lower);
+    case "outOfScope": return c.oosStrong || (c.constraintCount >= 1 && c.meaningful >= 4 && TX_OOS.test(c.lower));
+    case "success": return c.measurable && (c.meaningful >= 6 || c.validationStrong || c.acceptanceStrong);
+    default: return false;
+  }
+}
+
+/* Score one taxonomy category: Captured (1) / Weak (0.5) / Missing (0).
+ * Captured requires the strict, category-specific signal above; related
+ * text that is vague, generic, or thin stays Weak. */
+function scoreTaxonomyCategory(entry) {
+  const text = entry.fields.map((f) => state[f]).filter((v) => v && v.trim()).join(" ").trim();
+  const R = TAX_REASONS[entry.key];
+  if (!text) return { status: "Missing", score: 0, reason: R.m };
+  if (isInvalidInput(text)) return { status: "Missing", score: 0, reason: "Only placeholder or meaningless text was found." };
+  const lower = text.toLowerCase();
+  const c = buildTaxCtx(text, lower);
+  if (!c.vague && capturedFor(entry.key, c)) return { status: "Captured", score: 1, reason: R.c };
+  let reason;
+  if (entry.key === "success") reason = c.measurable ? R.wMeasurable : R.wNonMeasurable;
+  else reason = R.w;
+  return { status: "Weak", score: 0.5, reason };
+}
+
+/* Build the full evaluation result from the taxonomy + detected warnings. */
+function computeEvaluation(warnings) {
+  const rows = TAXONOMY.map((entry) => {
+    const s = scoreTaxonomyCategory(entry);
+    const relatedWarn = warnings.find((w) => entry.match.some((m) => w.title.toLowerCase().includes(m)));
+    return {
+      label: entry.label,
+      status: s.status,
+      score: s.score,
+      reason: s.reason,
+      relatedIssue: relatedWarn ? relatedWarn.title : (s.status !== "Captured" ? "Lowers baseline completeness" : "—"),
+      question: s.status === "Captured" ? "—" : entry.question,
+    };
+  });
+  const total = rows.reduce((a, r) => a + r.score, 0);
+  const baselinePct = Math.round((total / TAXONOMY.length) * 100);
+  const captured = rows.filter((r) => r.status === "Captured").length;
+  const weak = rows.filter((r) => r.status === "Weak").length;
+  const missing = rows.filter((r) => r.status === "Missing").length;
+
+  // Diagnostic Issue Count = missing + weak taxonomy categories + consistency
+  // warnings. Warnings are separate from the completeness score but included
+  // in the total diagnostic issue count.
+  const totalIssues = missing + weak + warnings.length;
+
+  // Strings used only for the optional Diagnostic Coverage matching.
+  const diagnosticIssues = rows.filter((r) => r.status !== "Captured").map((r) => r.label)
+    .concat(warnings.map((w) => w.title));
+
+  return { rows, total, baselinePct, captured, weak, missing, totalIssues, diagnosticIssues };
 }
 
 /* =================================================================
@@ -625,6 +812,8 @@ function escapeHtml(str) {
   return (str || "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 }
 let lastPackage = null;
+let lastSowPackage = null; // generation-layer SoW-schema-aligned export
+let lastDiagnosticIssues = []; // prototype-detected issues, for optional coverage matching
 
 function bindBasicInputs() {
   BASIC_FIELD_IDS.forEach((id) => {
@@ -755,15 +944,183 @@ function analyze() {
   // --- Completeness, relevance & consistency ---
   document.getElementById("completeness-fill").style.width = completeness.score + "%";
   document.getElementById("completeness-label").textContent = completeness.score + "%";
+  // Captured information = the fields that already hold strong, meaningful input.
+  const capturedItems = pkg.confirmed.map((c) => ({ cls: "ok", tag: "Captured", text: c.label }));
+  renderStatusList("captured-list", capturedItems, "Nothing specific captured yet — describe the assignment above, or fill the fields in Step 3.");
   renderStatusList("missing-list", missingItems, "No required categories are empty for this maturity level.", "improve this in Step 3");
   renderStatusList("weak-list", weakItems, "No weak (vague or thin) information detected.", "use the suggested follow-up questions in Step 3");
   renderStatusList("invalid-list", invalidItems, "No meaningless or random input detected.", "replace with meaningful input");
   renderStatusList("lowrel-list", lowRelItems, "All contextual signals are captured.", "add this context in Step 3");
   renderStatusList("warning-list", warnItems, "No consistency contradictions detected.", "address this in Step 3");
 
-  // --- Structured input package ---
+  // --- Taxonomy-based scoring & evaluation metrics (before the package) ---
+  const evalResult = computeEvaluation(warnings);
+  lastDiagnosticIssues = evalResult.diagnosticIssues;
+  renderEvaluation(evalResult, warnings.length, questions);
+  renderCoverage();
+
+  // --- Structured input package + readiness ---
   renderPackage(pkg);
+  // Simple, rule-based readiness signal (not a guarantee — just a hand-off cue).
+  const qualityIssues = missingItems.length + weakItems.length + invalidItems.length;
+  let readyText, readyCls;
+  if (completeness.score >= 80 && warnings.length === 0 && qualityIssues === 0) {
+    readyText = "Ready for hand-off to the generation layer"; readyCls = "level-high";
+  } else if (completeness.score >= 50) {
+    readyText = "Partially ready — resolve the follow-ups in Step 3 and rerun"; readyCls = "level-med";
+  } else {
+    readyText = "Early stage — more input needed before hand-off"; readyCls = "level-low";
+  }
+  document.getElementById("package-readiness").innerHTML = `<span class="maturity-badge ${readyCls}">${readyText}</span>`;
+
+  // Generation-layer SoW-schema-aligned JSON (with input-layer diagnostics).
+  lastSowPackage = buildSowPackage(maturity, evalResult, warnings, questions);
+  document.getElementById("sow-json").textContent = JSON.stringify(lastSowPackage, null, 2);
+
   document.getElementById("results").hidden = false;
+}
+
+/* Render the taxonomy scoring table + evaluation metrics. */
+function renderEvaluation(ev, warningCount, questions) {
+  document.getElementById("baseline-score").textContent =
+    `${ev.total.toFixed(1)} / ${TAXONOMY.length} (${ev.baselinePct}%)`;
+  document.getElementById("eval-breakdown").innerHTML =
+    `Captured: <strong>${ev.captured}</strong> · Weak: <strong>${ev.weak}</strong> · ` +
+    `Missing: <strong>${ev.missing}</strong> of ${TAXONOMY.length} taxonomy categories.`;
+
+  // Diagnostic Issue Count summary.
+  document.getElementById("dic-missing").textContent = ev.missing;
+  document.getElementById("dic-weak").textContent = ev.weak;
+  document.getElementById("dic-warnings").textContent = warningCount;
+  document.getElementById("dic-total").textContent = ev.missing + ev.weak + warningCount;
+
+  const pillFor = (s) => s === "Captured" ? "strong" : s === "Weak" ? "weak" : "missing";
+  document.getElementById("taxonomy-table").innerHTML = ev.rows.map((r) => `
+    <tr>
+      <td>${r.label}</td>
+      <td><span class="pill ${pillFor(r.status)}">${r.status}</span></td>
+      <td class="num">${r.score}</td>
+      <td>${escapeHtml(r.reason)}</td>
+      <td>${escapeHtml(r.relatedIssue)}</td>
+      <td>${r.question === "—" ? "—" : escapeHtml(r.question)}</td>
+    </tr>`).join("");
+
+  // Follow-up Actions Generated = adaptive follow-up questions (maturity-based
+  // diagnosis) + category-specific follow-up questions (taxonomy table), with
+  // exact-duplicate questions counted once.
+  const norm = (s) => s.trim().toLowerCase().replace(/\s+/g, " ");
+  const adaptiveQs = (questions || []).map((q) => q.text);
+  const categoryQs = ev.rows.filter((r) => r.question && r.question !== "—").map((r) => r.question);
+  const totalUnique = new Set([...adaptiveQs, ...categoryQs].map(norm)).size;
+  document.getElementById("fa-adaptive").textContent = adaptiveQs.length;
+  document.getElementById("fa-category").textContent = categoryQs.length;
+  document.getElementById("fa-total").textContent = totalUnique;
+}
+
+/* Significant tokens for the optional coverage match (length ≥ 5, not generic). */
+function coverageTokens(text) {
+  return (text.toLowerCase().match(/[a-z]+/g) || [])
+    .filter((w) => w.length >= 5 && !STOPWORDS.has(w) && !GENERIC_WORDS.has(w));
+}
+/* Optional Diagnostic Coverage Rate. Manual reference issues are entered by
+ * the researcher and are used ONLY here — they never affect the prototype's
+ * own scoring. Matching is a transparent keyword overlap, not AI. */
+function renderCoverage() {
+  const out = document.getElementById("coverage-output");
+  if (!out) return;
+  const raw = (document.getElementById("manual-issues").value || "").trim();
+  if (!raw) {
+    out.innerHTML = `<span class="muted">Diagnostic coverage requires manual taxonomy reference issues.</span>`;
+    return;
+  }
+  const lines = raw.split("\n").map((s) => s.trim()).filter(Boolean);
+  const issueTokenSets = lastDiagnosticIssues.map(coverageTokens);
+  let covered = 0;
+  const details = lines.map((line) => {
+    const lt = coverageTokens(line);
+    const hit = lt.length > 0 && issueTokenSets.some((it) => it.some((t) => lt.includes(t)));
+    if (hit) covered++;
+    return `<li class="${hit ? "ok" : "miss"}"><span class="tag">${hit ? "Detected" : "Missed"}</span><span>${escapeHtml(line)}</span></li>`;
+  }).join("");
+  const pct = Math.round((covered / lines.length) * 100);
+  out.innerHTML =
+    `<p><strong>Diagnostic Coverage Rate: ${covered} / ${lines.length} (${pct}%)</strong> ` +
+    `<span class="muted">= prototype-detected reference issues ÷ manually identified reference issues</span></p>` +
+    `<ul class="status-list">${details}</ul>`;
+}
+
+/* =================================================================
+ * SoW-schema-aligned export for the generation layer.
+ * -----------------------------------------------------------------
+ * Maps the taxonomy fields onto the Creator V2 / generation-layer SoW
+ * JSON schema and adds the input-layer diagnostics under
+ * `inputDiagnostics`. Additive only — the taxonomy scoring panel is
+ * unchanged; this is just how the final package is shaped for hand-off.
+ * ================================================================= */
+function sowFirstLine(s) {
+  const t = (s || "").trim().split(/[.\n]/)[0].trim();
+  return t.length > 90 ? t.slice(0, 90).trim() + "…" : t;
+}
+function sowLines(text) { // line / bullet items (keep commas inside a line)
+  return (text || "").split(/\n|;|•|·|^\s*[-*]/m).map((s) => s.replace(/^[\s\-*]+/, "").trim()).filter(Boolean);
+}
+function sowListItems(text) { // also split on commas (roles, resources)
+  return (text || "").split(/\n|;|•|·|,|^\s*[-*]/m).map((s) => s.replace(/^(\s|[-*]|and\s)+/i, "").trim()).filter(Boolean);
+}
+function sowNum(s) { const v = parseFloat(String(s).replace(/[,\s]/g, "")); return isNaN(v) ? null : v; }
+function sowBudget() {
+  const t = (state.budget + " " + state.workload).toLowerCase();
+  let hourlyrate = null, costestimate = null, averageweeklyhours = null, m;
+  m = t.match(/(?:€|\$|£)?\s?(\d[\d.,]*)\s*(?:\/|per\s*)?\s*(?:hour|hr)\b/); if (m) hourlyrate = sowNum(m[1]);
+  m = t.match(/(\d[\d.,]*)\s*(?:hours?|hrs?)\s*(?:\/|per|a)\s*week/); if (m) averageweeklyhours = sowNum(m[1]);
+  m = t.match(/(?:€|\$|£)\s?(\d[\d.,]*)\s*(k|m)?/) || t.match(/\b(\d[\d.,]{2,})\s*(k|m|eur|usd|euro|dollar)?/);
+  if (m) { let v = sowNum(m[1]); const suf = (m[2] || "").toLowerCase(); if (suf === "k") v *= 1000; if (suf === "m") v *= 1000000; costestimate = v; }
+  return { costestimate, hourlyrate, averageweeklyhours };
+}
+function sowWorkingType() {
+  const t = (state.workload + " " + state.budget + " " + state.initialDescription + " " + state.companyContext).toLowerCase();
+  const m = t.match(/\b(remote|hybrid|on[- ]?site|onsite|on premises?)\b/);
+  return m ? m[1].replace(/\s/, "-") : "";
+}
+function buildSowPackage(maturity, ev, warnings, questions) {
+  const v = (id) => (state[id] || "").trim();
+  const join = (...ids) => ids.map(v).filter(Boolean).join("\n");
+  // Follow-up actions = adaptive + category-specific questions, de-duplicated.
+  const norm = (s) => s.trim().toLowerCase().replace(/\s+/g, " ");
+  const seen = new Set(); const followUpActions = [];
+  [...(questions || []).map((q) => q.text), ...ev.rows.filter((r) => r.question && r.question !== "—").map((r) => r.question)]
+    .forEach((q) => { const k = norm(q); if (!seen.has(k)) { seen.add(k); followUpActions.push(q); } });
+
+  const includedActivities = sowLines(v("includedActivities")).length ? sowLines(v("includedActivities")) : sowLines(v("scope"));
+  return {
+    title: sowFirstLine(v("objective") || v("initialDescription")),
+    purpose: v("objective"),
+    definitionOfDone: join("deliverables", "definitionOfDone"),
+    boundaries: {
+      includedActivities,
+      outOfScope: [...sowLines(v("outOfScope")), ...sowLines(v("limitations")), ...sowLines(v("dependencies"))],
+    },
+    mustHaveRequirements: [...sowListItems(v("requiredRoles")), ...sowListItems(v("requiredExpertise"))],
+    niceToHaveRequirements: [],
+    timeline: [v("timeline"), v("milestones")].filter(Boolean).join(" — "),
+    budget: sowBudget(),
+    resources: [...sowListItems(v("tools")), ...sowListItems(v("documents"))],
+    location: { workingtype: sowWorkingType(), worklocation: null },
+    language: "en",
+    type: (detectDomains()[0] && detectDomains()[0].key) || "",
+    isFinalized: false,
+    percentage: null,
+    inputDiagnostics: {
+      maturityLevel: LEVEL_META[maturity.level].label,
+      baselineCompletenessScore: `${ev.total.toFixed(1)} / ${TAXONOMY.length} (${ev.baselinePct}%)`,
+      missingCategories: ev.rows.filter((r) => r.status === "Missing").map((r) => r.label),
+      weakCategories: ev.rows.filter((r) => r.status === "Weak").map((r) => r.label),
+      consistencyWarnings: warnings.map((w) => w.title),
+      followUpActions,
+      contextNotes: v("problem"),
+      successCriteriaNotes: [v("successCriteria"), v("acceptanceCriteria"), v("validationLogic")].filter(Boolean).join(" "),
+    },
+  };
 }
 
 function renderPackage(pkg) {
@@ -828,8 +1185,9 @@ function copyPackage() {
     () => flashButton("copy-btn", "Copied!"), () => flashButton("copy-btn", "Copy failed"));
 }
 function downloadPackage() {
-  if (!lastPackage) return;
-  const blob = new Blob([JSON.stringify(lastPackage, null, 2)], { type: "application/json" });
+  if (!lastSowPackage) return;
+  // Export the generation-layer SoW-schema-aligned JSON.
+  const blob = new Blob([JSON.stringify(lastSowPackage, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url; a.download = "sow-input-package.json"; a.click();
@@ -853,4 +1211,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("reset-btn").addEventListener("click", clearAll);
   document.getElementById("copy-btn").addEventListener("click", copyPackage);
   document.getElementById("download-btn").addEventListener("click", downloadPackage);
+  // Optional manual reference issues → recompute Diagnostic Coverage live.
+  const manual = document.getElementById("manual-issues");
+  if (manual) manual.addEventListener("input", renderCoverage);
 });

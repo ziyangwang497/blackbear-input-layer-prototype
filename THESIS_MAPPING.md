@@ -140,6 +140,86 @@ field "complete".
 | Low contextual relevance | Contextual relevance |
 | Consistency warnings | Consistency |
 | Maturity level + adaptive requirements/questions | Maturity appropriateness |
+| Baseline Completeness Score (taxonomy, Step 5) | Completeness (diagnostic visibility) |
+| Diagnostic Issue Count (missing + weak + warnings) | Diagnostic visibility |
+| Follow-up Actions Generated | Actionability |
+| Diagnostic Coverage Rate (optional) | Evaluation vs. manual reference |
+
+---
+
+## Evaluation metrics panel (Step 5)
+
+A dedicated **taxonomy-based scoring panel** sits between the diagnosis (Step 4) and the
+structured input package (Step 6). It evaluates the entered/pasted input against the
+**11 fixed thesis taxonomy categories** and produces repeatable evaluation metrics for
+Chapters 5–6. It is fully rule-based and transparent (no AI/LLM).
+
+### Taxonomy-based scoring logic
+Each of the 11 categories is scored **automatically** — `scoreTaxonomyCategory()` —
+without any manual assignment:
+
+- **Captured = 1** — specific, usable content.
+- **Weak = 0.5** — mentioned but vague, generic, too short, or lacking detail.
+- **Missing = 0** — absent or only placeholder/meaningless text.
+
+Scoring is **strict**: related text alone is not enough. *Captured* requires the
+information to be **specific, usable, and detailed** for that category, via a transparent
+category-specific test — e.g. timeline needs a concrete duration/deadline/dated
+milestones; budget a concrete amount/range or numeric workload; scope specific activities;
+deliverables concrete outputs and/or a definition of done; success measurable/verifiable
+criteria; resources named systems/tools/access; roles a role *plus* skills/seniority/
+tasks; objective/problem/context enough specific detail (not a generic phrase). A
+vague-wording penalty (e.g. "soon", "to be discussed", "TBD") caps a category at *Weak*.
+So "Improve engagement" → Weak, while "Increase weekly active user engagement … through
+automated communication" → Captured; "Timeline: soon" or "Q3" → Weak; empty budget →
+Missing; "Budget to be discussed" → Weak; "Need a developer" → Weak. The panel shows a
+per-category table with a **category-specific reason** for each score: **category, status,
+score, reason, related detected issue, related follow-up question**.
+
+### Baseline Completeness Score
+`Baseline Completeness = total category score ÷ 11` (e.g. **7.0 / 11 (64%)**). Consistency
+warnings are **counted separately** and are *not* part of this score.
+
+### Diagnostic Issue Count
+A main indicator summarising how many input-quality gaps the prototype makes visible:
+`missing information issues + weak information issues + consistency / readiness warnings =
+total diagnostic issues`. Warnings are separate from the completeness score but included
+in this total. (e.g. an exploratory case → Missing 8, Weak 0, Warnings 0, **Total 8**.)
+
+### Follow-up Actions Generated
+Counts all follow-up actions the prototype makes visible: **adaptive follow-up questions**
+(maturity-based diagnosis) + **category-specific follow-up questions** (taxonomy table) =
+**total** (exact duplicate questions counted once). Replaces the earlier Action Conversion
+Rate; it shows how the diagnosis turns into actionable guidance.
+
+### Consistency / readiness risks (separate)
+Counted as warnings, never folded into completeness — e.g. broad scope vs. short timeline;
+senior expertise required but budget missing; success target without rationale; complex
+scope but missing resources/access; scope defined but out-of-scope missing.
+
+### Diagnostic Coverage Rate (optional, evaluation only)
+If the researcher pastes **manual reference issues** (a gold-standard list, one per line),
+`Diagnostic Coverage = prototype-detected reference issues ÷ manually identified reference
+issues`, matched by transparent keyword overlap. If none are entered, the panel shows
+*"Diagnostic coverage requires manual taxonomy reference issues."* **Manual reference
+issues are used only for this metric and never affect the prototype's own scoring.**
+
+### Generation-layer output format
+The final structured input package (Step 6) is exported/displayed as a JSON object aligned
+with the Creator V2 / generation-layer SoW schema (`title`, `purpose`, `definitionOfDone`,
+`boundaries`, `mustHaveRequirements`, `niceToHaveRequirements`, `timeline`, `budget`,
+`resources`, `location`, `language`, `type`, `isFinalized`, `percentage`), with the
+input-layer diagnostics added under `inputDiagnostics`. The 11 taxonomy categories are
+mapped onto these fields by simple rules; the **taxonomy scoring panel is unchanged** —
+the taxonomy stays the evaluation lens, while the output package matches the
+generation-layer format.
+
+### What these metrics evaluate
+They measure **diagnostic visibility and actionability** — how completely and consistently
+the input is captured, how much of it is specific enough to be usable, and whether each
+detected gap is turned into an actionable follow-up. They explicitly **do not** judge the
+quality of a final Statement of Work; the prototype is an input-layer diagnostic, not a
+generator, and does not replace Creator V2.
 
 ---
 

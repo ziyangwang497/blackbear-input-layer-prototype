@@ -193,6 +193,41 @@ That comparison belongs in the thesis **evaluation chapter**, where the adaptive
 prototype's metrics are compared against a fixed baseline form after testing.
 The prototype's job is to *produce* those metrics, not to draw the conclusion.
 
+## 8. The evaluation metrics panel (taxonomy scoring)
+
+A rule-based scoring panel (Step 5) evaluates the input against the **11 fixed
+thesis taxonomy categories** before the final package.
+
+- **Taxonomy scoring** — each category is judged automatically as **Captured (1)**,
+  **Weak (0.5)**, or **Missing (0)**. Scoring is **strict**: related text alone is not
+  enough — *Captured* requires information that is specific, usable, and detailed for
+  that category (timeline → concrete duration/deadline/milestones; budget → concrete
+  amount/range or numeric workload; scope → specific activities; deliverables → concrete
+  outputs and/or a definition of done; success → measurable criteria; resources → named
+  systems/tools/access; roles → role plus skills/seniority/tasks). Vague wording
+  ("soon", "to be discussed", "TBD") caps a category at Weak. So "Improve engagement",
+  "Build a dashboard", "Timeline: soon"/"Q3", "Budget to be discussed", and "Need a
+  developer" all stay Weak; empty fields are Missing.
+- **Baseline Completeness Score** = total category score ÷ 11 (e.g. 7.0 / 11 = 64%).
+- **Diagnostic Issue Count** = missing information issues + weak information issues +
+  consistency / readiness warnings = **total diagnostic issues**. Warnings are counted
+  **separately** from the completeness score but included in this total.
+- **Follow-up Actions Generated** = adaptive follow-up questions (maturity-based
+  diagnosis) + category-specific follow-up questions (taxonomy table) = total, with exact
+  duplicate questions counted once (replaces the earlier Action Conversion Rate).
+- **Diagnostic Coverage Rate** *(optional)* — only if the researcher pastes manual
+  reference issues: prototype-detected ÷ manually identified. Manual reference issues
+  are used only for this metric and **never** change the prototype's own scoring.
+
+These metrics measure **diagnostic visibility and actionability** of the input before
+SoW generation — not the quality of a final Statement of Work.
+
+The final structured package (Step 6) is exported/displayed as a JSON object **aligned
+with the Creator V2 / generation-layer SoW schema** (title, purpose, definitionOfDone,
+boundaries, mustHaveRequirements, timeline, budget, resources, location, type, …), with
+the input-layer diagnostics added under `inputDiagnostics`. The taxonomy categories are
+mapped onto these fields; the taxonomy scoring panel itself is unchanged.
+
 ---
 
 # Part 2 — 中文（Chinese）
@@ -328,3 +363,33 @@ The prototype's job is to *produce* those metrics, not to draw the conclusion.
 原型有意**不包含**大型的"基线 vs. 自适应"对比。该对比应放在论文的**评估章节**，
 在测试之后将自适应原型的指标与固定基线表单进行比较。原型的职责是*产出*这些指标，
 而不是给出结论。
+
+## 8. 评估指标面板（分类法打分）
+
+在最终输入包之前，一个基于规则的打分面板（第 5 步）会针对**论文的 11 个固定分类法
+类别**评估输入。
+
+- **分类法打分** —— 每个类别会被自动判定为**已捕获（Captured = 1）**、
+  **薄弱（Weak = 0.5）**或**缺失（Missing = 0）**。打分是**严格的**：仅有相关文字
+  并不够 —— "已捕获"要求该类别的信息**具体、可用、足够详细**（时间线 → 具体的工期/
+  截止日期/里程碑；预算 → 具体金额/区间或量化工作量；范围 → 具体活动；交付物 →
+  具体产出和/或完成标准；成功标准 → 可衡量标准；资源 → 明确的系统/工具/访问权限；
+  角色 → 角色加技能/资历/任务）。含糊措辞（"soon / 待讨论 / TBD"）会将该类别压低为薄弱。
+  因此"Improve engagement""Build a dashboard""Timeline: soon / Q3""Budget to be
+  discussed""Need a developer"都会判为薄弱；空字段为缺失。
+- **基线完整度分数** = 各类别得分之和 ÷ 11（例如 7.0 / 11 = 64%）。
+- **诊断问题计数（Diagnostic Issue Count）** = 缺失信息问题 + 薄弱信息问题 +
+  一致性/就绪性警告 = **诊断问题总数**。警告与完整度分数分开计数，但计入该总数。
+- **生成的后续行动（Follow-up Actions Generated）** = 自适应后续问题（基于成熟度的
+  诊断）+ 类别专属后续问题（分类法表格）= 总数，完全相同的重复问题只计一次
+  （取代之前的"行动转化率"）。
+- **诊断覆盖率（Diagnostic Coverage Rate）**（*可选*）—— 仅当研究者粘贴人工参考问题时：
+  原型检测到的 ÷ 人工识别的。人工参考问题仅用于该指标，**绝不**改变原型自身的打分。
+
+这些指标衡量的是 SoW 生成之前输入的**诊断可见性与可行动性** —— 而不是最终工作说明书
+的质量。
+
+最终的结构化输入包（第 6 步）会以 JSON 对象的形式导出/显示，并**与 Creator V2／生成层
+的 SoW 模式对齐**（title、purpose、definitionOfDone、boundaries、mustHaveRequirements、
+timeline、budget、resources、location、type 等），输入层诊断信息放在 `inputDiagnostics`
+之下。分类法类别会映射到这些字段；分类法打分面板本身保持不变。

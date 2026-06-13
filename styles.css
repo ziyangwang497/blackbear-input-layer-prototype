@@ -309,6 +309,25 @@ details.group[open] > summary::before { content: "▾ "; }
 .pkg-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-weight: 700; font-size: 0.9rem; }
 @media (max-width: 560px) { .pkg-body .kv { grid-template-columns: 1fr; } }
 
+/* ---------- Evaluation metrics panel ---------- */
+.baseline { font-size: 1.3rem; margin: 4px 0; }
+.baseline strong { color: var(--primary); }
+.table-wrap { overflow-x: auto; }
+.eval-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.eval-table th, .eval-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.eval-table thead th { background: #f5f8fb; color: var(--primary-dark); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.03em; position: sticky; top: 0; }
+.eval-table td.num { text-align: center; font-weight: 700; }
+.eval-table tbody tr:nth-child(even) { background: #fafcfe; }
+.dic-table { max-width: 480px; }
+.dic-table tbody tr:last-child { background: #f3f7fb; }
+
+/* ---------- Generation-layer JSON block ---------- */
+.json-block {
+  background: #1f2733; color: #e6edf3; padding: 14px 16px; border-radius: 8px;
+  overflow: auto; max-height: 440px; font-size: 0.78rem; line-height: 1.45;
+  white-space: pre; font-family: "Consolas", "Monaco", "Courier New", monospace;
+}
+
 /* ---------- Footer ---------- */
 .site-footer { border-top: 1px solid var(--line); padding: 22px 0; background: #fff; }
 .site-footer .muted { font-size: 0.82rem; }

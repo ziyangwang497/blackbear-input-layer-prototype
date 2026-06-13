@@ -111,6 +111,60 @@ The logic is organised into commented blocks:
 By design, the prototype **does not** include a large "baseline vs. adaptive comparison"
 section — that comparison belongs in the thesis evaluation chapter after testing.
 
+## Evaluation metrics (taxonomy scoring panel, Step 5)
+
+A rule-based scoring panel sits before the final input package and evaluates the entered
+or pasted input against the **11 fixed thesis taxonomy categories** (objective; problem /
+business context; scope / included activities; deliverables / definition of done;
+timeline / duration / milestones; budget expectations; required roles / expertise;
+resources / access / materials; company / industry / team context; out-of-scope /
+limitations / dependencies; success criteria / validation logic).
+
+- **Per-category scoring** — each category is judged automatically as **Captured (1)**,
+  **Weak (0.5)**, or **Missing (0)**. Scoring is **strict**: related text alone is not
+  enough — *Captured* requires the information to be **specific, usable, and detailed**
+  for that category (e.g. timeline needs a concrete duration/deadline/milestones; budget a
+  concrete amount/range or numeric workload; scope specific activities; deliverables
+  concrete outputs and/or a definition of done; success measurable/verifiable criteria;
+  resources named systems/tools/access; roles a role *plus* skills/seniority/tasks). Vague,
+  generic, or thin entries (e.g. "Improve engagement", "Build a dashboard", "Timeline:
+  soon", "Budget to be discussed", "Need a developer") stay *Weak*. The table shows the
+  status, score, a category-specific reason, the related detected issue, and the related
+  follow-up question.
+- **Baseline Completeness Score** = total category score ÷ 11 (e.g. `7.0 / 11 (64%)`).
+  Consistency warnings are counted **separately**, not in this score.
+- **Diagnostic Issue Count** — a summary of how many input-quality gaps the prototype
+  makes visible: missing information issues + weak information issues + consistency /
+  readiness warnings = **total diagnostic issues**. Warnings are separate from the
+  completeness score but included in this total.
+- **Follow-up Actions Generated** — counts all follow-up actions the prototype makes
+  visible: **adaptive follow-up questions** (maturity-based diagnosis) + **category-specific
+  follow-up questions** (taxonomy table) = **total** (exact duplicate questions counted
+  once). A follow-up action is any targeted question generated to help close a missing,
+  weak, or risky input category.
+- **Diagnostic Coverage Rate** *(optional, evaluation only)* — if you paste manually
+  identified reference issues (one per line), it reports prototype-detected ÷ manually
+  identified, matched by keyword overlap. Otherwise it shows that manual reference issues
+  are required. **Manual reference issues never affect the prototype's own scoring.**
+
+The panel's main indicators are therefore: **Baseline Completeness Score · Diagnostic
+Issue Count · Follow-up Actions Generated · (optional) Diagnostic Coverage Rate.** These
+metrics evaluate **diagnostic visibility and actionability** before SoW generation — not
+the quality of a final Statement of Work. The panel is rule-based (no AI/LLM) and works
+for any pasted input package; nothing is hard-coded to specific examples.
+
+## Generation-layer output format
+
+The final structured input package (Step 6) also exports/displays a JSON object **aligned
+with the Creator V2 / generation-layer SoW schema** (`title`, `purpose`,
+`definitionOfDone`, `boundaries.{includedActivities,outOfScope}`, `mustHaveRequirements`,
+`niceToHaveRequirements`, `timeline`, `budget.{costestimate,hourlyrate,averageweeklyhours}`,
+`resources`, `location`, `language`, `type`, `isFinalized`, `percentage`). The input-layer
+diagnostics (maturity level, baseline completeness, missing/weak categories, consistency
+warnings, follow-up actions, context/success notes) are added under `inputDiagnostics`.
+The taxonomy categories are mapped onto these fields with simple rules; the taxonomy
+scoring panel itself is unchanged. "Download JSON" exports this object.
+
 ## Pattern tuning & data handling
 
 The rules (maturity indicators, completeness categories, and consistency checks) were

@@ -12,23 +12,16 @@
   <!-- ============================================================= -->
   <header class="site-header">
     <div class="container">
-      <p class="eyebrow">Bachelor thesis artifact · AI4Business · Blackbear</p>
       <h1>Adaptive Input Layer for Statement&nbsp;of&nbsp;Work Generation</h1>
       <p class="lead">
-        A transparent, <strong>rule-based adaptive input-layer model</strong>.
-        It screens the <strong>maturity</strong> of an assignment, requests
-        <strong>maturity-specific information</strong>, asks
-        <strong>adaptive follow-up questions</strong>, runs
-        <strong>completeness and consistency checks</strong>, and produces a
-        <strong>structured input package</strong> for a later generation layer.
+        A rule-based prototype that diagnoses assignment maturity, identifies
+        missing or weak input, and prepares a structured package for SoW
+        generation.
       </p>
       <div class="callout">
-        <strong>This is an input-layer model, not a SoW generator.</strong>
-        It does not write a Statement of Work. It improves how assignment
-        information is collected, classified, clarified, checked, and
-        structured <em>before</em> generation. Everything runs locally in your
-        browser — no backend, database, API key, confidential data, or real
-        Blackbear documents are used.
+        This prototype demonstrates the input-layer logic used in the thesis. It
+        evaluates assignment information before SoW generation; it does not
+        generate the final SoW.
       </div>
     </div>
   </header>
@@ -49,12 +42,12 @@
         <li class="flow-step"><span class="flow-i">2</span>Rule-based maturity screening</li>
         <li class="flow-step"><span class="flow-i">3</span>Maturity-specific requirements &amp; follow-up questions</li>
         <li class="flow-step"><span class="flow-i">4</span>Completeness, relevance &amp; consistency checks</li>
-        <li class="flow-step final"><span class="flow-i">5</span>Structured input package</li>
+        <li class="flow-step"><span class="flow-i">5</span>Taxonomy-based scoring &amp; evaluation metrics</li>
+        <li class="flow-step final"><span class="flow-i">6</span>Structured input package</li>
       </ol>
       <p class="muted" style="margin-top:12px">
-        It is an <strong>improvement loop</strong>: the checks (Step 4) diagnose
-        the input, you improve the fields in Step 3 and rerun, and the checks and
-        package update.
+        The flow turns raw assignment information into a scored and structured input
+        package.
       </p>
     </section>
 
@@ -64,11 +57,8 @@
     <section class="card" id="examples">
       <h2><span class="step-num">◇</span> Demo cases only</h2>
       <div class="note-box">
-        These buttons <strong>only load fictional examples</strong> to illustrate
-        the model. <strong>They do not let you pick a maturity level.</strong>
-        In the real workflow you simply fill in the Initial intake below, and the
-        prototype <em>classifies</em> the maturity from the information you
-        provide.
+        Demo cases load fictional examples only. In the real workflow, maturity is
+        classified automatically from the provided input.
       </div>
       <div class="example-buttons" id="example-buttons">
         <!-- Demo buttons injected by script.js -->
@@ -81,38 +71,30 @@
     <section class="card" id="intake">
       <h2><span class="step-num">1</span> Initial intake</h2>
       <p class="muted">
-        Start simple. Describe the assignment and a few basics — you do
-        <strong>not</strong> need to fill a long form here. After screening, the
-        prototype will ask only for the information that matters for your
-        assignment's maturity level.
+        You can start with a rough idea, a short task request, or a detailed
+        briefing. The prototype will screen the maturity of the input and ask
+        only for the information that matters next.
       </p>
 
-      <label class="field-label" for="initialDescription">Initial assignment description</label>
-      <textarea id="initialDescription" rows="3"
-        placeholder="e.g. We want to explore how AI could improve our intake process..."></textarea>
+      <label class="field-label" for="initialDescription">Describe the assignment, problem, or idea in your own words</label>
+      <textarea id="initialDescription" rows="5"
+        placeholder="e.g. We want to explore how AI could improve our intake process…"></textarea>
 
-      <div class="basic-grid">
-        <div>
-          <label class="field-label" for="objective">Objective</label>
-          <textarea id="objective" rows="2"></textarea>
-        </div>
-        <div>
-          <label class="field-label" for="problem">Problem statement / business context</label>
-          <textarea id="problem" rows="2"></textarea>
-        </div>
-        <div>
+      <details class="group">
+        <summary>Add optional context</summary>
+        <div class="group-body">
           <label class="field-label" for="companyContext">Organisation / context</label>
           <textarea id="companyContext" rows="2"></textarea>
-        </div>
-        <div>
           <label class="field-label" for="userRole">Your role</label>
           <textarea id="userRole" rows="2"></textarea>
+          <label class="field-label" for="limitations">Known constraints or background information</label>
+          <textarea id="limitations" rows="2"></textarea>
         </div>
-      </div>
+      </details>
 
       <div class="actions">
         <button id="analyze-btn" class="btn btn-primary" type="button">
-          Screen maturity &amp; analyze
+          Screen maturity &amp; diagnose input needs
         </button>
         <button id="reset-btn" class="btn btn-ghost" type="button">Clear all</button>
       </div>
@@ -144,13 +126,17 @@
         <h2><span class="step-num">3</span> Maturity-specific input requirements</h2>
         <p class="muted" id="req-explanation"></p>
         <p class="muted"><strong>This is where you improve the input.</strong>
-          Fill or strengthen the fields below, then press “Update analysis”.</p>
-        <div id="req-fields"></div>
+          The follow-up questions below guide what to provide; fill or strengthen
+          the relevant fields, then press “Update analysis”.</p>
 
-        <!-- Suggested follow-up questions: short guidance for improving the fields above -->
-        <h3>Suggested follow-up questions</h3>
+        <!-- Recommended follow-up questions: the adaptive questions guide the fields below -->
+        <h3>Recommended follow-up questions</h3>
         <p class="muted" id="followup-intro"></p>
         <ol id="followup-list" class="question-list"></ol>
+
+        <!-- Relevant fields to provide the missing information -->
+        <h3>Relevant fields</h3>
+        <div id="req-fields"></div>
 
         <div class="actions">
           <button id="rerun-btn" class="btn btn-secondary" type="button">
@@ -181,6 +167,9 @@
           <span id="completeness-label" class="progress-label"></span>
         </div>
 
+        <h3>Captured information</h3>
+        <ul id="captured-list" class="status-list"></ul>
+
         <h3>Missing information</h3>
         <ul id="missing-list" class="status-list"></ul>
 
@@ -197,14 +186,98 @@
         <ul id="warning-list" class="status-list"></ul>
       </section>
 
-      <!-- 5. STRUCTURED INPUT PACKAGE FOR LATER SoW GENERATION -->
+      <!-- 5. TAXONOMY-BASED SCORING & EVALUATION METRICS (before the package) -->
+      <section class="card" id="evaluation">
+        <h2><span class="step-num">5</span> Taxonomy-based scoring &amp; evaluation metrics</h2>
+        <div class="note-box">
+          The taxonomy scores are generated by the prototype’s rule-based diagnostic
+          logic. Manual reference issues, if provided, are used only for evaluation
+          comparison and do not affect the prototype’s own scoring.
+        </div>
+        <p class="muted">
+          Each of the 11 thesis taxonomy categories is scored automatically from the
+          entered content: <strong>Captured = 1</strong>, <strong>Weak = 0.5</strong>,
+          <strong>Missing = 0</strong>. Consistency warnings are counted separately and
+          are not part of the completeness score.
+        </p>
+
+        <h3>Baseline completeness score</h3>
+        <p class="baseline"><strong id="baseline-score"></strong></p>
+        <p id="eval-breakdown" class="muted"></p>
+
+        <h3>Diagnostic Issue Count</h3>
+        <table class="eval-table dic-table">
+          <thead><tr><th>Issue type</th><th>Count</th></tr></thead>
+          <tbody>
+            <tr><td>Missing information issues</td><td class="num" id="dic-missing"></td></tr>
+            <tr><td>Weak information issues</td><td class="num" id="dic-weak"></td></tr>
+            <tr><td>Consistency / readiness warnings</td><td class="num" id="dic-warnings"></td></tr>
+            <tr><td><strong>Total diagnostic issues</strong></td><td class="num"><strong id="dic-total"></strong></td></tr>
+          </tbody>
+        </table>
+        <p class="muted">
+          This metric counts how many input-quality gaps the prototype makes visible.
+          Warnings are counted separately from the completeness score but included in the
+          total diagnostic issue count.
+        </p>
+
+        <h3>Per-category scoring</h3>
+        <div class="table-wrap">
+          <table class="eval-table">
+            <thead><tr>
+              <th>Taxonomy category</th><th>Status</th><th>Score</th>
+              <th>Reason for score</th><th>Related detected issue</th><th>Related follow-up question</th>
+            </tr></thead>
+            <tbody id="taxonomy-table"></tbody>
+          </table>
+        </div>
+
+        <h3>Follow-up actions generated</h3>
+        <table class="eval-table dic-table">
+          <tbody>
+            <tr><td>Adaptive follow-up questions</td><td class="num" id="fa-adaptive"></td></tr>
+            <tr><td>Category-specific follow-up questions</td><td class="num" id="fa-category"></td></tr>
+            <tr><td><strong>Total follow-up actions</strong></td><td class="num"><strong id="fa-total"></strong></td></tr>
+          </tbody>
+        </table>
+        <p class="muted">
+          A follow-up action is any targeted question generated by the prototype to help
+          close a missing, weak, or risky input category. Exact duplicate questions are
+          counted once.
+        </p>
+
+        <details class="group">
+          <summary>Optional: manual reference issues (for Diagnostic Coverage Rate)</summary>
+          <div class="group-body">
+            <p class="muted">
+              Paste manually identified reference issues, one per line, from a
+              gold-standard review. Used only to compute the Diagnostic Coverage Rate for
+              thesis evaluation — it does <strong>not</strong> change any score above.
+            </p>
+            <textarea id="manual-issues" rows="4"
+              placeholder="One issue per line, e.g.&#10;success criteria not measurable&#10;out-of-scope missing&#10;budget unclear"></textarea>
+            <div id="coverage-output" style="margin-top:10px"></div>
+          </div>
+        </details>
+      </section>
+
+      <!-- 6. STRUCTURED INPUT PACKAGE FOR LATER SoW GENERATION -->
       <section class="card package-card" id="package">
-        <h2><span class="step-num">5</span> Structured input package for later SoW generation</h2>
+        <h2><span class="step-num">6</span> Structured input package for later SoW generation</h2>
         <p class="muted">
           The hand-off for a later SoW generation layer — <strong>not a finished
           Statement of Work.</strong>
         </p>
+        <p><strong>Input package readiness:</strong> <span id="package-readiness"></span></p>
         <div id="package-output" class="package"></div>
+
+        <h3>Generation-layer JSON</h3>
+        <p class="muted">
+          This package is aligned with the Creator&nbsp;V2 / generation-layer SoW schema,
+          with input-layer diagnostics added under <code>inputDiagnostics</code>.
+        </p>
+        <pre id="sow-json" class="json-block"></pre>
+
         <div class="actions">
           <button id="copy-btn" class="btn btn-secondary" type="button">Copy as text</button>
           <button id="download-btn" class="btn btn-secondary" type="button">Download JSON</button>
