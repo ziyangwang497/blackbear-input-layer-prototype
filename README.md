@@ -30,6 +30,22 @@ Maturity is **detected from the information provided — never chosen by hand**.
 fills a short Initial intake; the prototype classifies maturity and then asks only for the
 information that matters at that maturity level.
 
+## Two workflows (modes)
+
+The Initial intake offers two tabs. They share the same underlying logic and scoring —
+only which sections are emphasized changes — and they should **not** be read as competing
+scores:
+
+- **Screen raw assignment idea** (Mode 1) — for a rough idea or unstructured description.
+  Maturity screening is shown prominently and drives the adaptive follow-up questions
+  (i.e. **adaptive interaction / routing**). The taxonomy scoring panel stays collapsed
+  (secondary).
+- **Evaluate reconstructed input package** (Mode 2) — for thesis **Chapter 6 evaluation**
+  of a labelled package reconstructed from a Creator V2 conversation. The maturity
+  dashboard and normal-flow metrics are de-emphasized; the **taxonomy-based scoring**,
+  Diagnostic Issue Count, Follow-up Actions Generated, and the SoW-compatible JSON are
+  shown prominently. *Maturity screening is not the formal Chapter 6 evaluation metric.*
+
 ## How to run
 
 No build step, server, or installation is required.
@@ -77,9 +93,15 @@ fill the maturity-specific follow-up fields and press **Update analysis** to ref
 
 The logic is organised into commented blocks:
 
-- **Field quality** (section 2) – the primitive every rule uses: each field is classified
-  as `missing`, `weak` (present but vague/too short), or `strong`. A single `state` object
-  is the source of truth, so a field's value survives even when its input is off-screen.
+- **Field quality** (section 2) – the primitive every rule uses (shared by **both**
+  taxonomy scoring and maturity screening): each field is classified as `missing`, `weak`,
+  or `strong`. A field is **never `strong` just because it is non-empty** — a field that
+  only contains a negative placeholder ("Not specified", "Not clearly specified",
+  "Unknown", "N/A", "TBD", "No information provided", …) is **`missing`**, and a field
+  whose content is dominated by uncertainty/limitation markers ("unclear", "limited",
+  "partly", "not fully", "but", "however", "insufficient", "vague") is at most **`weak`**.
+  A single `state` object is the source of truth, so a field's value survives even when its
+  input is off-screen.
 - **Maturity screening** (section 3) – counts strong indicators and applies threshold
   rules. *High* requires objective, scope, deliverables, and success criteria all strong
   plus ≥ 6 of 8 indicators strong; *Low* is ≤ 2 strong indicators; *Medium* is in between.
@@ -152,6 +174,21 @@ Issue Count · Follow-up Actions Generated · (optional) Diagnostic Coverage Rat
 metrics evaluate **diagnostic visibility and actionability** before SoW generation — not
 the quality of a final Statement of Work. The panel is rule-based (no AI/LLM) and works
 for any pasted input package; nothing is hard-coded to specific examples.
+
+## Evaluating reconstructed input packages (Chapter 6)
+
+The Initial intake includes an **"Evaluate reconstructed input package"** button. Paste a
+labelled baseline package (reconstructed from a Creator V2 conversation) into the main
+textbox and click it: the prototype uses **rule-based section-label matching** (no LLM/NLP)
+to recognise headings such as *Purpose / objective*, *Scope / included activities*,
+*Deliverables / definition of done*, *Timeline / duration / milestones*, *Budget
+expectations*, *Required roles / expertise*, *Resources / access / materials*,
+*Company / industry / team context*, *Out-of-scope / limitations / dependencies*,
+*Success criteria / validation logic*, etc., maps the content under each label to the
+taxonomy fields, and then runs the existing scoring panel (Baseline Completeness Score,
+Diagnostic Issue Count, Follow-up Actions Generated, and the SoW-compatible JSON with
+`inputDiagnostics`). This mode is **only** for evaluation; the normal flow (initial input →
+maturity screening → adaptive follow-up fields) is unchanged.
 
 ## Generation-layer output format
 

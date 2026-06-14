@@ -169,6 +169,30 @@ details.group[open] > summary::before { content: "▾ "; }
 .btn-ghost { background: #fff; border-color: var(--line); color: var(--muted); }
 .btn-ghost:hover { border-color: var(--muted); }
 
+/* ---------- Workflow mode tabs ---------- */
+.mode-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 8px; }
+.mode-tab {
+  border: 1px solid var(--line); background: #fff; color: var(--muted);
+  padding: 9px 16px; border-radius: 8px; font: inherit; font-weight: 600;
+  font-size: 0.9rem; cursor: pointer;
+}
+.mode-tab:hover { border-color: var(--muted); }
+.mode-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+#mode-hint { margin-top: 0; }
+
+/* Mode 2 (evaluate): de-emphasize the normal-flow sections. */
+#results.mode-eval #metrics,
+#results.mode-eval #maturity,
+#results.mode-eval #requirements,
+#results.mode-eval #checks { display: none; }
+
+/* Collapsible taxonomy panel (secondary in raw mode). */
+h2.collapsible { cursor: pointer; }
+.collapse-caret::before { content: "▾"; color: var(--accent); margin-left: 6px; font-size: 0.8em; }
+#evaluation.collapsed .collapse-caret::before { content: "▸"; }
+#evaluation.collapsed > :not(h2) { display: none; }
+.eval-rubric-note { background: var(--warn-bg); border: 1px solid #ecdcc0; border-radius: 8px; padding: 8px 12px; font-size: 0.9rem; }
+
 .example-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
 .example-buttons .btn { background: #eef3f8; color: var(--primary-dark); border-color: var(--line); }
 .example-buttons .btn:hover { background: #e2ebf4; }

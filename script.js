@@ -218,6 +218,23 @@ const VAGUE_MARKERS = [
 ];
 const MIN_STRONG_LENGTH = 4;
 
+/* Negative placeholder phrases meaning "no information here". A field made up
+ * ONLY of these (no other usable assignment information) scores MISSING — in
+ * both taxonomy scoring AND maturity screening. Longest phrases first so
+ * "not clearly specified" is removed before "not specified". */
+const NEGATIVE_PLACEHOLDERS = [
+  "not clearly specified", "not clearly defined", "no information provided",
+  "no meaningful information", "to be determined", "to be defined", "to be confirmed",
+  "not yet specified", "not yet defined", "not specified", "not defined", "not provided",
+  "not mentioned", "not available", "not applicable", "not sure yet", "not sure",
+  "no information", "no info", "unspecified", "undefined", "unknown", "unclear",
+  "n a", "tbd", "none", "not yet",
+].sort((a, b) => b.length - a.length);
+
+/* Uncertainty / limitation markers (word-boundary) that cap a field at WEAK,
+ * even when other usable information is present. */
+const UNCERTAINTY_RE = /\b(unclear|limited|partly|partially|not fully|however|insufficient|vague|but)\b/;
+
 /* Placeholder / keyboard-mash tokens → treated as INVALID (meaningless). */
 const PLACEHOLDER_WORDS = new Set(
   ("test testing asdf asdfg asdfgh asdfghjkl qwerty qwertyuiop zxcv zxcvbn lorem ipsum " +
@@ -367,13 +384,32 @@ function isInvalidInput(raw) {
   return false;
 }
 
-/* Four-level assessment of a single field. */
+/* True when a field, after removing negative placeholder phrases, has NO
+ * remaining usable assignment information — i.e. it only says "no info".
+ * e.g. "Not clearly specified.", "Unknown", "N/A", "No information provided". */
+function negativePlaceholderOnly(text) {
+  let t = " " + String(text).toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim() + " ";
+  if (t.trim() === "") return false; // empty is handled as "missing" upstream
+  for (const p of NEGATIVE_PLACEHOLDERS) {
+    t = t.replace(new RegExp("\\s" + p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s", "g"), " ");
+  }
+  // Anything meaningful left? (drop stopwords / generic filler / very short words)
+  const remaining = t.split(/\s+/).filter(Boolean)
+    .filter((w) => w.length > 3 && !STOPWORDS.has(w) && !GENERIC_WORDS.has(w));
+  return remaining.length === 0;
+}
+
+/* Four-level assessment of a single field. Used by BOTH taxonomy scoring and
+ * maturity screening, so the rules stay consistent. A field is never Strong
+ * just because it is non-empty. */
 function fieldStatus(text) {
   const raw = (text || "").trim();
   if (raw.length === 0) return "missing";
   if (isInvalidInput(raw)) return "invalid";
+  if (negativePlaceholderOnly(raw)) return "missing";        // "Not clearly specified.", "Unknown", "N/A" …
   const t = raw.toLowerCase();
   if (!/[a-z]/.test(t)) return "weak";                       // bare numbers/dates need context
+  if (UNCERTAINTY_RE.test(t)) return "weak";                 // has info but dominant uncertainty/limitation
   if (VAGUE_MARKERS.some((m) => t.includes(m))) return "weak";
   if (raw.length < MIN_STRONG_LENGTH) return "weak";
   if (meaningfulTokens(t).length === 0) return "weak";       // only generic filler
@@ -661,7 +697,7 @@ function buildTaxCtx(text, lower) {
   return {
     lower,
     meaningful: meaningfulTokens(text).length,
-    vague: WEAK_PHRASES.some((p) => lower.includes(p)) || VAGUE_MARKERS.some((m) => lower.includes(m)),
+    vague: WEAK_PHRASES.some((p) => lower.includes(p)) || VAGUE_MARKERS.some((m) => lower.includes(m)) || UNCERTAINTY_RE.test(lower),
     dodStrong: fieldStatus(state.definitionOfDone) === "strong",
     multiOut: lineItemCount(state.deliverables),
     hasRole: TX_ROLE.test((state.requiredRoles + " " + state.requiredExpertise).toLowerCase()),
@@ -701,6 +737,7 @@ function scoreTaxonomyCategory(entry) {
   const R = TAX_REASONS[entry.key];
   if (!text) return { status: "Missing", score: 0, reason: R.m };
   if (isInvalidInput(text)) return { status: "Missing", score: 0, reason: "Only placeholder or meaningless text was found." };
+  if (negativePlaceholderOnly(text)) return { status: "Missing", score: 0, reason: R.m }; // "Not specified", "Unknown" …
   const lower = text.toLowerCase();
   const c = buildTaxCtx(text, lower);
   if (!c.vague && capturedFor(entry.key, c)) return { status: "Captured", score: 1, reason: R.c };
@@ -1167,6 +1204,81 @@ function clearAll() {
   document.getElementById("results").hidden = true;
 }
 
+/* =================================================================
+ * EVALUATION MODE — parse a labelled reconstructed input package
+ * -----------------------------------------------------------------
+ * Rule-based section-label matching only (NO LLM/NLP). It recognises
+ * the labels below and maps the text under each to a taxonomy field,
+ * then runs the existing analyze() pipeline unchanged. Used for thesis
+ * Chapter 6 evaluation of reconstructed Creator V2 input packages.
+ *
+ * Labels that have no dedicated field (Project title, Location / work
+ * mode) are still recognised as section boundaries; their text remains
+ * in the pasted description, where domain / work-mode detection reads it.
+ * ================================================================= */
+const PKG_LABELS = [
+  ["title", "project title"],
+  ["objective", "purpose objective"], ["objective", "purpose"], ["objective", "objective"],
+  ["problem", "problem statement business context"], ["problem", "problem statement"], ["problem", "business context"], ["problem", "problem"],
+  ["scope", "scope included activities"], ["includedActivities", "included activities"], ["scope", "scope"],
+  ["definitionOfDone", "deliverables definition of done"], ["definitionOfDone", "definition of done"], ["deliverables", "deliverables"],
+  ["timeline", "timeline duration milestones"], ["timeline", "timeline"], ["timeline", "duration"], ["milestones", "milestones"],
+  ["budget", "budget expectations"], ["budget", "budget"],
+  ["requiredRoles", "required roles expertise"], ["requiredRoles", "required roles"], ["requiredExpertise", "expertise"], ["requiredRoles", "roles"],
+  ["tools", "resources access materials"], ["tools", "resources"], ["tools", "access"], ["documents", "materials"],
+  ["companyContext", "company industry team context"], ["companyContext", "company context"], ["industryContext", "industry context"], ["teamContext", "team context"], ["companyContext", "context"],
+  ["outOfScope", "out of scope limitations dependencies"], ["outOfScope", "out of scope"], ["limitations", "limitations"], ["dependencies", "dependencies"],
+  ["successCriteria", "success criteria validation logic"], ["successCriteria", "success criteria"], ["validationLogic", "validation logic"], ["acceptanceCriteria", "acceptance criteria"],
+  ["location", "location work mode"], ["location", "location"], ["location", "work mode"], ["location", "working mode"],
+];
+function pkgNorm(s) { return (s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(); }
+/* Decide whether a heading-portion matches a known label. */
+function matchPkgLabel(head) {
+  const n = pkgNorm(head);
+  if (!n) return null;
+  for (const [field, phrase] of PKG_LABELS) if (n === phrase) return { field, exact: true };
+  for (const [field, phrase] of PKG_LABELS) if (n.startsWith(phrase + " ")) return { field, exact: false };
+  return null;
+}
+/* Parse labelled sections → { fieldId: text }. */
+function parseLabelledPackage(text) {
+  const acc = {};
+  let current = null;
+  for (const rawLine of String(text).split(/\r?\n/)) {
+    const line = rawLine.replace(/^[\s>#*\-•·]+/, "").replace(/\*\*/g, "").trim();
+    if (!line) continue;
+    const colon = line.indexOf(":");
+    const head = colon >= 0 ? line.slice(0, colon) : line;
+    const inline = colon >= 0 ? line.slice(colon + 1).trim() : "";
+    const m = matchPkgLabel(head);
+    if (m && (colon >= 0 || m.exact)) {              // treat as a section heading
+      current = m.field;
+      if (!acc[current]) acc[current] = [];
+      if (inline) acc[current].push(inline);
+    } else if (current) {                            // content under the current heading
+      acc[current].push(line);
+    }
+  }
+  const out = {};
+  for (const f in acc) out[f] = acc[f].join("\n").trim();
+  return out;
+}
+/* Evaluation entry point: parse the pasted package, populate the taxonomy
+ * fields, and run the existing pipeline. Does NOT change the normal flow. */
+function evaluatePackage() {
+  const text = (document.getElementById("initialDescription").value || "").trim();
+  if (!text) { flashButton("evaluate-pkg-btn", "Paste a package first"); return; }
+  // Reset structured fields but keep the pasted package text.
+  ALL_FIELD_IDS.forEach((id) => { if (id !== "initialDescription") state[id] = ""; });
+  state.initialDescription = text;
+  const parsed = parseLabelledPackage(text);
+  Object.entries(parsed).forEach(([id, content]) => { if (id in state && content) state[id] = content; });
+  syncBasicInputs();
+  analyze();
+  // Mode 2 highlights the taxonomy evaluation panel as the main result.
+  document.getElementById("evaluation").scrollIntoView({ behavior: "smooth" });
+}
+
 function packageToText() {
   if (!lastPackage) return "";
   const p = lastPackage;
@@ -1200,15 +1312,59 @@ function flashButton(id, msg) {
   setTimeout(() => { btn.textContent = original; }, 1500);
 }
 
+/* =================================================================
+ * WORKFLOW MODE (UI visibility only — no logic/scoring change)
+ * -----------------------------------------------------------------
+ * "raw"  → Screen raw assignment idea: maturity screening prominent,
+ *          taxonomy panel collapsed (secondary).
+ * "eval" → Evaluate reconstructed input package: maturity dashboard /
+ *          normal metrics hidden, taxonomy panel + JSON prominent.
+ * Both modes use the SAME underlying analyze()/scoring; only which
+ * sections are emphasized changes. */
+let currentMode = "raw";
+function setMode(mode) {
+  currentMode = mode;
+  const eval_ = mode === "eval";
+  document.getElementById("mode-raw-tab").classList.toggle("active", !eval_);
+  document.getElementById("mode-eval-tab").classList.toggle("active", eval_);
+  document.getElementById("analyze-btn").hidden = eval_;
+  document.getElementById("evaluate-pkg-btn").hidden = !eval_;
+  document.getElementById("eval-parser-note").hidden = !eval_;
+  document.getElementById("mode-hint").textContent = eval_
+    ? "Paste a labelled reconstructed input package (from a Creator V2 conversation). The taxonomy rubric scores it for Chapter 6 evaluation."
+    : "Provide a rough idea, short task request, or unstructured description. Maturity screening adapts the follow-up questions (used for adaptive routing, not as the Chapter 6 metric).";
+  // Optional context block is only relevant in raw mode; eval mode pastes a full package.
+  document.getElementById("optional-context").hidden = eval_;
+  document.getElementById("intake-label").textContent = eval_
+    ? "Paste the reconstructed input package"
+    : "Describe the assignment, problem, or idea in your own words";
+  document.getElementById("initialDescription").placeholder = eval_
+    ? "Paste the labelled baseline input package here, including sections such as Purpose / objective, Scope / included activities, Deliverables, Timeline, Budget, Resources, and Success criteria…"
+    : "e.g. We want to explore how AI could improve our intake process…";
+  const results = document.getElementById("results");
+  results.classList.toggle("mode-eval", eval_);
+  results.classList.toggle("mode-raw", !eval_);
+  // Taxonomy panel: collapsed/secondary in raw mode, expanded/prominent in eval mode.
+  document.getElementById("evaluation").classList.toggle("collapsed", !eval_);
+  // Switching mode clears any stale result view (avoids cross-mode confusion).
+  results.hidden = true;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   bindBasicInputs();
   renderExampleButtons();
+  document.getElementById("mode-raw-tab").addEventListener("click", () => setMode("raw"));
+  document.getElementById("mode-eval-tab").addEventListener("click", () => setMode("eval"));
+  document.getElementById("evaluation-h2").addEventListener("click", () =>
+    document.getElementById("evaluation").classList.toggle("collapsed"));
+  setMode("raw");
   document.getElementById("analyze-btn").addEventListener("click", () => {
     analyze();
     document.getElementById("results").scrollIntoView({ behavior: "smooth" });
   });
   document.getElementById("rerun-btn").addEventListener("click", analyze);
   document.getElementById("reset-btn").addEventListener("click", clearAll);
+  document.getElementById("evaluate-pkg-btn").addEventListener("click", evaluatePackage);
   document.getElementById("copy-btn").addEventListener("click", copyPackage);
   document.getElementById("download-btn").addEventListener("click", downloadPackage);
   // Optional manual reference issues → recompute Diagnostic Coverage live.

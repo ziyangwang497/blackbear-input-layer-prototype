@@ -62,14 +62,17 @@ levels (`fieldStatus()` in `script.js`):
 
 | Level | Rule | Example |
 |---|---|---|
-| **Missing** | empty | `""` |
+| **Missing** | empty; **or only a negative placeholder** ("Not specified", "Not clearly specified", "Unknown", "N/A", "TBD", "No information provided", …) | `""`, `Not clearly specified.`, `Unknown`, `N/A` |
 | **Invalid / meaningless** | repeated characters, symbols-only, placeholder words, or keyboard mash (long consonant run) | `222222`, `aaaaaa`, `!!!!`, `test`, `asdf`, `asdfgh` |
-| **Weak** | present but vague, very short, bare numbers, or only generic filler | `unknown`, `n/a`, `AI`, `12345`, `good stuff` |
-| **Strong** | present and meaningful assignment information | `Improve project intake quality.` |
+| **Weak** | present but vague/very short/bare numbers/only generic filler, **or dominated by uncertainty/limitation markers** ("unclear", "limited", "partly", "not fully", "but", "however", "insufficient", "vague") | `unknown`, `n/a`, `AI`, `12345`, `good stuff`, `…but the broader reason is unclear` |
+| **Strong** | present and specific, meaningful assignment information | `Improve project intake quality.` |
 
 Only **strong** fields count as complete (full weight); **weak** earns half;
-**invalid** and **missing** earn nothing. So `222222` or `asdf` can never make a
-field "complete".
+**invalid** and **missing** earn nothing. A field is **never strong just because it is
+non-empty**: `Not clearly specified.` is **Missing**, not Strong — and this same
+`fieldStatus()` primitive is used by **both** taxonomy scoring and maturity screening, so
+the two stay consistent (a "Not specified" field never becomes a strong maturity
+indicator).
 
 ---
 
@@ -203,6 +206,29 @@ If the researcher pastes **manual reference issues** (a gold-standard list, one 
 issues`, matched by transparent keyword overlap. If none are entered, the panel shows
 *"Diagnostic coverage requires manual taxonomy reference issues."* **Manual reference
 issues are used only for this metric and never affect the prototype's own scoring.**
+
+### Two modes (and what each measures)
+The UI offers two workflows that **share the same logic and scoring** — only which sections
+are emphasized changes, and they are **not competing scores**:
+
+- **Screen raw assignment idea** — *maturity screening* is prominent and is used for
+  **adaptive interaction / routing** (which follow-up questions to ask). The taxonomy panel
+  is collapsed (secondary).
+- **Evaluate reconstructed input package** — the *taxonomy-based rubric* is prominent and is
+  the **formal Chapter 6 evaluation** metric; the maturity dashboard and normal-flow metrics
+  are de-emphasized.
+
+In short: **maturity screening = adaptive routing; taxonomy scoring = Chapter 6 evaluation.**
+The two should not be interpreted as rival numbers.
+
+### Evaluation mode (reconstructed input packages)
+For Chapter 6, the **"Evaluate reconstructed input package"** button parses a labelled
+baseline package (reconstructed from a Creator V2 conversation) by **rule-based
+section-label matching** (no LLM/NLP): it recognises the taxonomy headings, maps the text
+under each to the taxonomy fields, and runs the same scoring panel. This fixes the issue
+where a pasted high-maturity package was otherwise read as raw low-maturity text. It is
+additive — the normal flow (initial input → maturity screening → adaptive follow-up
+fields) is unchanged, and no cases are hard-coded.
 
 ### Generation-layer output format
 The final structured input package (Step 6) is exported/displayed as a JSON object aligned
