@@ -1321,10 +1321,47 @@ function flashButton(id, msg) {
  *          normal metrics hidden, taxonomy panel + JSON prominent.
  * Both modes use the SAME underlying analyze()/scoring; only which
  * sections are emphasized changes. */
+/* Mode-specific "Prototype model logic" flow shown at the top of the page.
+ * UI/explanation only — it mirrors what each mode actually does. */
+const MODE_FLOWS = {
+  raw: {
+    intro: "Mode 1 — adaptive intake and maturity screening for a rough, unstructured idea. The maturity result guides routing and follow-up questions; it is not the Chapter 6 evaluation metric.",
+    steps: [
+      "Raw assignment idea",
+      "Rule-based maturity screening",
+      "Maturity-specific input needs",
+      "Suggested follow-up questions",
+      "Input gap diagnosis",
+      "Structured input package",
+    ],
+    explain: "This flow clarifies a rough idea: it screens maturity, routes the right follow-up questions, and surfaces what still needs to be provided.",
+  },
+  eval: {
+    intro: "Mode 2 — evaluate a reconstructed / section-labelled input package against the taxonomy, then produce an improved structured input package for later SoW generation.",
+    steps: [
+      "Parse section-labelled input",
+      "Taxonomy category mapping",
+      "Baseline completeness scoring",
+      "Diagnostic issue count",
+      "Follow-up actions",
+      "Generate structured input package",
+    ],
+    explain: "This flow evaluates a reconstructed or section-labelled input package against the taxonomy, identifies missing or weak areas, proposes follow-up actions, and generates a structured input package for later SoW generation.",
+  },
+};
+function renderFlow(mode) {
+  const f = MODE_FLOWS[mode] || MODE_FLOWS.raw;
+  document.getElementById("flow-intro").textContent = f.intro;
+  document.getElementById("flow-explain").textContent = f.explain;
+  document.getElementById("flow-steps").innerHTML = f.steps.map((s, i) =>
+    `<li class="flow-step${i === f.steps.length - 1 ? " final" : ""}"><span class="flow-i">${i + 1}</span>${s}</li>`).join("");
+}
+
 let currentMode = "raw";
 function setMode(mode) {
   currentMode = mode;
   const eval_ = mode === "eval";
+  renderFlow(mode);
   document.getElementById("mode-raw-tab").classList.toggle("active", !eval_);
   document.getElementById("mode-eval-tab").classList.toggle("active", eval_);
   document.getElementById("analyze-btn").hidden = eval_;
