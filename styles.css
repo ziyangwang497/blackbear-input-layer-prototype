@@ -352,6 +352,16 @@ h2.collapsible { cursor: pointer; }
   white-space: pre; font-family: "Consolas", "Monaco", "Courier New", monospace;
 }
 
+/* ---------- Optional generation-layer feedback ---------- */
+#genfeedback { border-top: 4px solid var(--accent); }
+.genfeedback-load input[type="file"] { display: block; margin-top: 4px; font: inherit; font-size: 0.9rem; }
+#gen-status { font-weight: 600; color: var(--primary-dark); }
+.field-highlight {
+  outline: 3px solid var(--warn);
+  box-shadow: 0 0 0 4px rgba(179, 116, 26, 0.18);
+  border-radius: 8px;
+}
+
 /* ---------- Footer ---------- */
 .site-footer { border-top: 1px solid var(--line); padding: 22px 0; background: #fff; }
 .site-footer .muted { font-size: 0.82rem; }

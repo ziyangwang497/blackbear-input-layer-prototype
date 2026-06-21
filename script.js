@@ -1268,6 +1268,9 @@ function parseLabelledPackage(text) {
 function evaluatePackage() {
   const text = (document.getElementById("initialDescription").value || "").trim();
   if (!text) { flashButton("evaluate-pkg-btn", "Paste a package first"); return; }
+  // Clear any refinement highlight/guidance now that the user is re-evaluating.
+  document.getElementById("initialDescription").classList.remove("field-highlight");
+  document.getElementById("refine-note").hidden = true;
   // Reset structured fields but keep the pasted package text.
   ALL_FIELD_IDS.forEach((id) => { if (id !== "initialDescription") state[id] = ""; });
   state.initialDescription = text;
@@ -1383,8 +1386,187 @@ function setMode(mode) {
   results.classList.toggle("mode-raw", !eval_);
   // Taxonomy panel: collapsed/secondary in raw mode, expanded/prominent in eval mode.
   document.getElementById("evaluation").classList.toggle("collapsed", !eval_);
+  // Clear any refinement highlight/guidance when modes are switched.
+  const rn = document.getElementById("refine-note"); if (rn) rn.hidden = true;
+  const ta0 = document.getElementById("initialDescription"); if (ta0) ta0.classList.remove("field-highlight");
   // Switching mode clears any stale result view (avoids cross-mode confusion).
   results.hidden = true;
+}
+
+/* =================================================================
+ * OPTIONAL GENERATION-LAYER FEEDBACK (second-pass safeguard)
+ * -----------------------------------------------------------------
+ * Local, file-based. Reads only the REMAINING-GAP signals returned by
+ * the generation layer (status / isFinalized / percentage /
+ * displayMessage / schemaIssues / placeholder fields). It never shows
+ * the generation layer's followUpQuestions (they duplicate the
+ * input-layer questions), never calls a backend/LLM, and never marks
+ * the SoW as finalized — only the generation layer decides that.
+ * ================================================================= */
+let lastGenFeedback = null;
+let lastGenGaps = [];
+
+const GEN_PLACEHOLDER_RE = /to be specified|to be agreed|to be determined|to be defined/i;
+function isGenPlaceholder(v) {
+  if (v == null) return true;
+  if (Array.isArray(v)) return v.length === 0 || v.every(isGenPlaceholder);
+  if (typeof v === "string") { const t = v.trim(); return t === "" || GEN_PLACEHOLDER_RE.test(t); }
+  return false; // numbers / booleans are real values
+}
+function getByPath(obj, path) { return path.split(".").reduce((o, k) => (o == null ? undefined : o[k]), obj); }
+
+/* SoW field path → input-layer field(s) + label (mapping per the design). */
+const GEN_GAP_MAP = [
+  { path: "purpose", fields: ["objective", "problem"], label: "Objective / purpose" },
+  { path: "definitionOfDone", fields: ["definitionOfDone", "deliverables"], label: "Deliverables / definition of done" },
+  { path: "boundaries.includedActivities", fields: ["scope", "includedActivities"], label: "Scope / included activities" },
+  { path: "boundaries.outOfScope", fields: ["outOfScope", "limitations", "dependencies"], label: "Out-of-scope / constraints" },
+  { path: "mustHaveRequirements", fields: ["requiredRoles", "requiredExpertise"], label: "Required roles / expertise" },
+  { path: "resources", fields: ["tools", "documents"], label: "Resources / access / materials" },
+  { path: "timeline", fields: ["timeline", "milestones"], label: "Timeline / milestones" },
+  { path: "budget", fields: ["budget", "workload"], label: "Budget / workload" },
+  { path: "budget.costestimate", fields: ["budget", "workload"], label: "Budget / workload" },
+  { path: "budget.hourlyrate", fields: ["budget", "workload"], label: "Budget / workload" },
+  { path: "budget.averageweeklyhours", fields: ["budget", "workload"], label: "Budget / workload" },
+];
+/* displayMessage keywords → fields, only for areas the SoW schema has no slot for. */
+const GEN_MSG_MAP = [
+  { re: /stakeholder/i, fields: ["stakeholders", "approvalOwner"], label: "Stakeholders / approval owner" },
+  { re: /success crit|acceptance crit|validation/i, fields: ["successCriteria", "acceptanceCriteria", "validationLogic"], label: "Success criteria / validation" },
+  { re: /assumption|limitation|dependenc|constraint/i, fields: ["assumptions", "dependencies", "limitations", "risks"], label: "Constraints / dependencies" },
+];
+
+function parseGenFeedback(text) {
+  let data;
+  try { data = JSON.parse(text); } catch (e) { return { ok: false, error: "That is not valid JSON." }; }
+  if (!data || typeof data !== "object") return { ok: false, error: "Unexpected JSON structure." };
+  const sow = data.sow || data.SoW || ((data.title || data.purpose) ? data : null); // sow / SoW are aliases
+  if (!sow) return { ok: false, error: "No SoW object found (expected 'sow' or 'SoW')." };
+  return {
+    ok: true,
+    sow,
+    status: data.status || null,
+    isFinalized: typeof data.isFinalized === "boolean" ? data.isFinalized
+      : (typeof sow.isFinalized === "boolean" ? sow.isFinalized : null),
+    percentage: typeof sow.percentage === "number" ? sow.percentage
+      : (typeof data.percentage === "number" ? data.percentage : null),
+    displayMessage: data.displayMessage || "",
+    schemaIssues: Array.isArray(data.schemaIssues) ? data.schemaIssues : [],
+    // followUpQuestions are intentionally NOT read into the UI (they duplicate input-layer questions).
+  };
+}
+
+/* Remaining gaps only: schemaIssues + still-placeholder SoW fields + displayMessage-only
+ * areas. Skips anything the input layer already has strong content for (no duplicate asks). */
+function extractGenGaps(fb) {
+  const byLabel = new Map();
+  const addGap = (entry) => {
+    if (!entry) return;
+    if (entry.fields.some((f) => fieldStatus(state[f]) === "strong")) return; // already covered
+    if (!byLabel.has(entry.label)) byLabel.set(entry.label, entry);
+  };
+  // 1. schemaIssues → path → mapped fields
+  fb.schemaIssues.forEach((s) => {
+    const m = String(s).match(/SoW\.([A-Za-z.]+)/);
+    if (!m) return;
+    const path = m[1];
+    addGap(GEN_GAP_MAP.find((g) => g.path === path) || GEN_GAP_MAP.find((g) => path.startsWith(g.path + ".")));
+  });
+  // 2. SoW fields still holding placeholder content (budget handled separately below)
+  GEN_GAP_MAP.forEach((g) => {
+    if (g.path.startsWith("budget")) return;
+    const v = getByPath(fb.sow, g.path);
+    if (v !== undefined && isGenPlaceholder(v)) addGap(g);
+  });
+  // budget object: a gap only when every numeric component is empty
+  const b = fb.sow.budget;
+  if (b && typeof b === "object" && [b.costestimate, b.hourlyrate, b.averageweeklyhours].every((x) => x == null || x === 0)) {
+    addGap(GEN_GAP_MAP.find((g) => g.path === "budget"));
+  }
+  // 3. displayMessage-only areas (no SoW slot exists for these)
+  GEN_MSG_MAP.forEach((m) => { if (m.re.test(fb.displayMessage)) addGap(m); });
+  return [...byLabel.values()];
+}
+
+function renderGenFeedback(text) {
+  const result = document.getElementById("gen-result");
+  const statusEl = document.getElementById("gen-status");
+  const msgEl = document.getElementById("gen-message");
+  const gapsEl = document.getElementById("gen-gaps");
+  const refineBtn = document.getElementById("refine-gaps-btn");
+  result.hidden = false;
+  const fb = parseGenFeedback(text);
+  if (!fb.ok) {
+    lastGenFeedback = null; lastGenGaps = [];
+    statusEl.textContent = "Could not read feedback: " + fb.error;
+    msgEl.textContent = ""; gapsEl.innerHTML = ""; refineBtn.disabled = true;
+    return;
+  }
+  lastGenFeedback = fb;
+  const bits = [];
+  if (fb.status) bits.push("status: " + fb.status);
+  if (fb.isFinalized !== null) bits.push("isFinalized: " + fb.isFinalized);
+  if (fb.percentage !== null) bits.push("percentage: " + fb.percentage + "%");
+  statusEl.textContent = bits.join("   ·   ") || "No status fields provided.";
+  msgEl.textContent = fb.displayMessage || "";
+  lastGenGaps = extractGenGaps(fb);
+  if (lastGenGaps.length === 0) {
+    gapsEl.innerHTML = `<li class="ok"><span class="tag">OK</span><span>No remaining gaps beyond what the input layer already covers.</span></li>`;
+    refineBtn.disabled = true;
+  } else {
+    gapsEl.innerHTML = lastGenGaps.map((g) =>
+      `<li class="weak"><span class="tag">Gap</span><span>${escapeHtml(g.label)} still needs clarification — refine it in the input package and re-run the analysis.</span></li>`).join("");
+    refineBtn.disabled = false;
+  }
+}
+
+/* Reconstruct a merged labelled package: strong current input is preserved, gaps are
+ * filled from non-placeholder SoW values, and placeholders are never written. */
+function refineRemainingGaps() {
+  if (!lastGenFeedback) return;
+  const sow = lastGenFeedback.sow;
+  const sval = (id) => fieldStatus((state[id] || "").trim()) === "strong" ? state[id].trim() : "";
+  const sowVal = (path) => {
+    const x = getByPath(sow, path);
+    if (isGenPlaceholder(x)) return "";
+    if (Array.isArray(x)) return x.filter((y) => y && !isGenPlaceholder(y)).join("; ");
+    return String(x == null ? "" : x).trim();
+  };
+  const budgetText = () => {
+    const b = sow.budget || {}; const parts = [];
+    if (b.costestimate) parts.push("cost estimate " + b.costestimate);
+    if (b.hourlyrate) parts.push("rate " + b.hourlyrate);
+    if (b.averageweeklyhours) parts.push(b.averageweeklyhours + " hours/week");
+    return parts.join(", ");
+  };
+  const combine = (...vals) => vals.filter(Boolean).join("; ");
+  const sections = [
+    ["Purpose / objective", sval("objective") || sowVal("purpose")],
+    ["Problem statement / business context", sval("problem")],
+    ["Scope / included activities", combine(sval("scope"), sval("includedActivities")) || sowVal("boundaries.includedActivities")],
+    ["Deliverables / definition of done", combine(sval("deliverables"), sval("definitionOfDone")) || sowVal("definitionOfDone")],
+    ["Timeline / duration / milestones", combine(sval("timeline"), sval("milestones")) || sowVal("timeline")],
+    ["Budget expectations", combine(sval("budget"), sval("workload")) || budgetText()],
+    ["Required roles / expertise", combine(sval("requiredRoles"), sval("requiredExpertise")) || sowVal("mustHaveRequirements")],
+    ["Resources / access / materials", combine(sval("tools"), sval("documents")) || sowVal("resources")],
+    ["Company / industry / team context", combine(sval("companyContext"), sval("industryContext"), sval("teamContext"), sval("userRole"))],
+    ["Out-of-scope / limitations / dependencies", combine(sval("outOfScope"), sval("limitations"), sval("dependencies")) || sowVal("boundaries.outOfScope")],
+    ["Success criteria / validation logic", combine(sval("successCriteria"), sval("acceptanceCriteria"), sval("validationLogic"))],
+  ];
+  const text = sections.map(([label, val]) => `${label}: ${val}`).join("\n");
+  state.initialDescription = text;
+  document.getElementById("initialDescription").value = text;
+  setMode("eval"); // Mode 2 = evaluate reconstructed input package (also hides stale results)
+  // Persist refinement guidance + highlight the editable package (refine-note lives in the intake).
+  const labels = lastGenGaps.map((g) => g.label);
+  const note = document.getElementById("refine-note");
+  note.innerHTML = "<strong>Refine the highlighted package, then press “Evaluate reconstructed input package”.</strong> " +
+    (labels.length ? "Remaining gaps to complete: " + escapeHtml(labels.join(", ")) + ". " : "") +
+    "Refining here only improves the input package — the generation layer decides finalization.";
+  note.hidden = false;
+  const ta = document.getElementById("initialDescription");
+  ta.classList.add("field-highlight");
+  document.getElementById("intake").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -1407,4 +1589,17 @@ document.addEventListener("DOMContentLoaded", () => {
   // Optional manual reference issues → recompute Diagnostic Coverage live.
   const manual = document.getElementById("manual-issues");
   if (manual) manual.addEventListener("input", renderCoverage);
+  // Optional generation-layer feedback (local, file-based).
+  document.getElementById("gen-load-btn").addEventListener("click", () => {
+    const t = document.getElementById("gen-paste").value.trim();
+    if (t) renderGenFeedback(t);
+  });
+  document.getElementById("gen-file").addEventListener("change", (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => renderGenFeedback(String(reader.result || ""));
+    reader.readAsText(file);
+  });
+  document.getElementById("refine-gaps-btn").addEventListener("click", refineRemainingGaps);
 });

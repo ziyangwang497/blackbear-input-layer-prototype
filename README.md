@@ -190,6 +190,21 @@ Diagnostic Issue Count, Follow-up Actions Generated, and the SoW-compatible JSON
 `inputDiagnostics`). This mode is **only** for evaluation; the normal flow (initial input →
 maturity screening → adaptive follow-up fields) is unchanged.
 
+## Optional generation-layer feedback (second-pass safeguard)
+
+After the package goes (offline) to the generation layer, the layer returns the
+**remaining gaps** that still block finalization. The optional card below the structured
+input package lets you **load or paste that `.followup.json` locally** (no backend, no
+LLM, no live integration). It reads only the gap signals — `status`, `isFinalized`,
+`percentage`, `displayMessage`, `schemaIssues`, and any SoW fields still set to
+`"To be specified."` — maps them to the input-layer fields, de-duplicates, and **hides
+gaps the input layer already covers**. It deliberately does **not** show the generation
+layer's `followUpQuestions` (those duplicate the input-layer questions). "Refine remaining
+gaps" preserves your strong input, prefills only safe non-placeholder values from the
+returned SoW, switches to Mode 2, and highlights the package to refine and re-run. The
+prototype never marks the SoW finalized — only the generation layer decides that. The
+example feedback files are private fixtures and are not bundled or deployed.
+
 ## Generation-layer output format
 
 The final structured input package (Step 6) also exports/displays a JSON object **aligned

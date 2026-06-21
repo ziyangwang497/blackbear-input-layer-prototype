@@ -97,6 +97,7 @@
         This mode parses labelled sections of a reconstructed Creator&nbsp;V2 package and
         applies the taxonomy scoring logic. It does not replace the normal screening flow.
       </p>
+      <div class="note-box" id="refine-note" hidden></div>
     </section>
 
     <!-- ========================================================= -->
@@ -284,6 +285,44 @@
         <div class="actions">
           <button id="copy-btn" class="btn btn-secondary" type="button">Copy as text</button>
           <button id="download-btn" class="btn btn-secondary" type="button">Download JSON</button>
+        </div>
+      </section>
+
+      <!-- OPTIONAL: second-pass generation-layer feedback (local, file-based) -->
+      <section class="card" id="genfeedback">
+        <h2><span class="step-num">+</span> Optional generation-layer feedback</h2>
+        <p class="muted">
+          Second-pass safeguard only. Load a <code>.followup.json</code> returned by the
+          generation layer to see the <strong>remaining gaps</strong> that still block
+          finalization. This does not generate a SoW and does not re-run the full intake —
+          everything stays local.
+        </p>
+
+        <div class="genfeedback-load">
+          <label class="field-label" for="gen-file">Load a feedback file</label>
+          <input type="file" id="gen-file" accept=".json,application/json" />
+          <label class="field-label" for="gen-paste" style="margin-top:10px">…or paste the feedback JSON</label>
+          <textarea id="gen-paste" rows="4" placeholder="Paste the .followup.json (or .sow.json) returned by the generation layer here…"></textarea>
+          <div class="actions">
+            <button id="gen-load-btn" class="btn btn-secondary" type="button">Load feedback</button>
+          </div>
+        </div>
+
+        <div id="gen-result" hidden>
+          <h3>Generation status</h3>
+          <p id="gen-status" class="muted"></p>
+          <p id="gen-message" class="muted"></p>
+
+          <h3>Remaining gaps</h3>
+          <ul id="gen-gaps" class="status-list"></ul>
+
+          <div class="actions">
+            <button id="refine-gaps-btn" class="btn btn-primary" type="button">Refine remaining gaps</button>
+          </div>
+          <p class="muted">
+            The generation layer decides finalization — refining here only improves the
+            input package; it does not mark the SoW as finalized.
+          </p>
         </div>
       </section>
 
