@@ -300,7 +300,7 @@ const TEST_CASES = [
       industryContext: "Manufacturing.",
       scope: "Process PDF supplier invoices, extract header and line-item data, and flag exceptions for review.",
       includedActivities: "OCR extraction, validation rules, and an exceptions review queue.",
-      outOfScope: "Payment execution and a full ERP migration are out of scope.",
+      outOfScope: "This engagement is limited to building the invoice data-extraction tool and integrating it with the existing accounting system. Payment execution, live transaction processing, a full ERP migration, finance-staff training, and ongoing post-launch operational support remain the responsibility of the client's finance and IT teams and are not included in this engagement.",
       deliverables: "- invoice data-extraction module\n- exceptions review queue\n- integration with the existing accounting system\n- user guide",
       definitionOfDone: "The tool processes 95% of standard invoices without manual data entry and routes the rest to the exceptions queue.",
       timeline: "10 weeks with two milestones.",
@@ -329,6 +329,7 @@ const TEST_CASES = [
       userRole: "Operations director.",
       scope: "Automate all processes in every department across all sites, end-to-end.",
       includedActivities: "Includes finance, HR, logistics, and customer-service automation.",
+      outOfScope: "Training is out of scope.",
       deliverables: "- automated finance workflows\n- automated HR onboarding\n- automated logistics tracking\n- automated support responses",
       timeline: "1 month.",
       budget: "Very limited budget.",
@@ -416,6 +417,35 @@ function fieldStatus(text) {
   return "strong";
 }
 
+/* ----- Rigorous OUT-OF-SCOPE assessment (Blackbear feedback #1) -----
+ * Out-of-scope is NOT Strong just because it states one exclusion. Strong
+ * requires a deliberate boundary: explicit exclusion language + concrete
+ * detail + a contextual connection to the included work / who is responsible.
+ * Transparent local signals only (no character-count-only rule). */
+const OOS_EXCL_RE = /\b(out[-\s]?of[-\s]?scope|not in scope|not included|excluded?|exclude|outside (the |this )?(scope|engagement|project)|does not include|will not (include|cover)|no[t]? part of)\b/;
+/* A deliberate boundary/ownership/contrast — what is covered, or who remains
+ * responsible — distinguishes a meaningful boundary from a bare exclusion. */
+const OOS_BOUNDARY_RE = /\b(while|instead of|limited to|remains? the responsibility|responsibility of|not included in this (engagement|project|assignment)|rather than|as opposed to|beyond the scope|owned by|handled by|provided by the client|client'?s responsibility|focuses only on|in contrast)\b/;
+function outOfScopeStrength(text) {
+  const base = fieldStatus(text);
+  if (base === "missing" || base === "invalid") return base;   // empty / placeholder / gibberish
+  const t = (text || "").toLowerCase();
+  const hasExclusion = OOS_EXCL_RE.test(t);
+  const hasBoundary = OOS_BOUNDARY_RE.test(t);
+  const detailed = meaningfulTokens(t).length >= 10;           // deliberate, not a short isolated line
+  // Strong only when an explicit exclusion is tied to a deliberate boundary AND detailed.
+  if (hasExclusion && hasBoundary && detailed) return "strong";
+  return "weak";                                               // a thin / standalone exclusion
+}
+/* Per-field status, field-aware: out-of-scope uses the rigorous rule above. */
+function rawStatusOfField(id) {
+  return id === "outOfScope" ? outOfScopeStrength(state[id]) : fieldStatus(state[id]);
+}
+function effectiveQualityOfField(id) {
+  const s = rawStatusOfField(id);
+  return s === "invalid" ? "missing" : s;
+}
+
 /* Effective quality for scoring/classification: invalid info is as
  * useless as missing, so it is treated as missing here (but still shown
  * distinctly as "invalid" in the dashboard). */
@@ -428,7 +458,7 @@ const QUALITY_RANK = { missing: 0, weak: 1, strong: 2 };
 function bestQuality(fieldIds) {
   let best = "missing";
   for (const id of fieldIds) {
-    const q = fieldQuality(state[id]);
+    const q = effectiveQualityOfField(id);
     if (QUALITY_RANK[q] > QUALITY_RANK[best]) best = q;
   }
   return best;
@@ -440,7 +470,7 @@ const STATUS_RANK = { missing: 0, invalid: 1, weak: 2, strong: 3 };
 function categoryStatusRaw(key) {
   let best = "missing";
   for (const id of CATEGORIES[key].fields) {
-    const s = fieldStatus(state[id]);
+    const s = rawStatusOfField(id);
     if (STATUS_RANK[s] > STATUS_RANK[best]) best = s;
   }
   return best;
@@ -704,7 +734,7 @@ function buildTaxCtx(text, lower) {
     roleCount: state.requiredRoles.split(/[,\n]/).map((s) => s.trim()).filter(Boolean).length,
     hasExpertise: present("requiredExpertise"),
     senioritySkill: TX_SENIORITY.test(lower),
-    oosStrong: fieldStatus(state.outOfScope) === "strong",
+    oosStrong: outOfScopeStrength(state.outOfScope) === "strong",
     constraintCount: ["limitations", "dependencies", "assumptions", "risks"].filter(present).length,
     measurable: TX_MEASURABLE.test(lower),
     validationStrong: fieldStatus(state.validationLogic) === "strong",
@@ -740,7 +770,10 @@ function scoreTaxonomyCategory(entry) {
   if (negativePlaceholderOnly(text)) return { status: "Missing", score: 0, reason: R.m }; // "Not specified", "Unknown" …
   const lower = text.toLowerCase();
   const c = buildTaxCtx(text, lower);
-  if (!c.vague && capturedFor(entry.key, c)) return { status: "Captured", score: 1, reason: R.c };
+  // Out-of-scope rigor is self-contained (boundary phrases like "limited to" are
+  // legitimate), so it bypasses the generic vague gate.
+  const captured = entry.key === "outOfScope" ? capturedFor("outOfScope", c) : (!c.vague && capturedFor(entry.key, c));
+  if (captured) return { status: "Captured", score: 1, reason: R.c };
   let reason;
   if (entry.key === "success") reason = c.measurable ? R.wMeasurable : R.wNonMeasurable;
   else reason = R.w;
@@ -782,21 +815,133 @@ function computeEvaluation(warnings) {
 /* =================================================================
  * 7. ADAPTIVE FOLLOW-UP QUESTIONS
  * ================================================================= */
+/* ----- Contextual follow-up questions (Blackbear feedback #2) -----
+ * Build targeted questions that quote concise summaries of the user's own
+ * input. Rule-based only (no LLM). Summaries are short (not whole textareas);
+ * text is escaped at render time. Generic fallbacks are used when there is
+ * not enough user information to personalise. */
+function clipText(text, maxWords) {
+  const t = String(text || "").replace(/\s+/g, " ").trim().replace(/^[-*•·\s]+/, "");
+  if (!t) return "";
+  const words = t.split(" ");
+  if (words.length <= maxWords) return t.replace(/[.;,]+$/, "");
+  return words.slice(0, maxWords).join(" ") + "…";
+}
+/* Summary of a field only if it holds usable (non-missing/invalid) content. */
+function fieldSummary(id, maxWords) {
+  const s = id === "outOfScope" ? outOfScopeStrength(state[id]) : fieldStatus(state[id]);
+  if (s === "missing" || s === "invalid") return "";
+  return clipText(state[id], maxWords || 12);
+}
+function firstSummary(ids, maxWords) {
+  for (const id of ids) { const x = fieldSummary(id, maxWords); if (x) return x; }
+  return "";
+}
+/* Contextual versions of the five validation questions (Blackbear examples). */
+function validationQuestions() {
+  const objective = firstSummary(["objective", "problem"], 14);
+  const deliverables = firstSummary(["deliverables", "definitionOfDone"], 14);
+  const scope = firstSummary(["scope", "includedActivities"], 14);
+  const timeline = firstSummary(["timeline", "milestones"], 10);
+  const budget = firstSummary(["budget", "workload"], 10);
+  const oos = firstSummary(["outOfScope"], 16);
+  const depends = firstSummary(["dependencies", "tools", "documents", "stakeholders", "approvalOwner"], 14);
+  const work = deliverables ? `the deliverables “${deliverables}”` : (scope ? `the scope “${scope}”` : "");
+  const qs = [];
+  // 1 — timeline vs work
+  qs.push(timeline && work
+    ? `The package proposes “${timeline}” for ${work}. Is this timeline sufficient for the stated work, including any review or acceptance activities?`
+    : "Does the timeline match the expected deliverables, including review and acceptance activities?");
+  // 2 — success / acceptance
+  qs.push(objective
+    ? `For the objective of “${objective}”, what measurable result or acceptance threshold would confirm that the assignment has succeeded?`
+    : "What measurable result or acceptance threshold would confirm that the assignment has succeeded?");
+  // 3 — assumptions / dependencies
+  qs.push(depends
+    ? `The assignment depends on ${depends}. Who will provide the required access, input, or approval, and by when?`
+    : "Which assumptions and dependencies must be confirmed, and who provides the required access, input, or approval — by when?");
+  // 4 — out-of-scope boundary
+  qs.push(oos
+    ? `The package currently excludes “${oos}”. Given that the assignment includes ${scope ? `“${scope}”` : "the stated scope"}, should related implementation, operational ownership, training, or post-delivery support also be explicitly included or excluded?`
+    : `Given the stated scope${scope ? ` (“${scope}”)` : ""}, should related implementation, operational ownership, training, or post-delivery support be explicitly included or excluded?`);
+  // 5 — priority under constraint
+  qs.push((work && (budget || timeline))
+    ? `The package combines ${work} with ${budget ? `a budget/workload of “${budget}”` : `a timeline of “${timeline}”`}. Which deliverables are highest priority if the available time or effort becomes constrained?`
+    : "Which deliverables are highest priority if the available time or effort becomes constrained?");
+  return qs;
+}
+/* Contextual version of a per-category clarification question; falls back to
+ * the generic category question when there is not enough user information. */
+function contextualGapQuestion(key) {
+  const objective = firstSummary(["objective", "problem"], 14);
+  const scope = firstSummary(["scope", "includedActivities"], 14);
+  const deliverables = firstSummary(["deliverables", "definitionOfDone"], 14);
+  const generic = (CATEGORIES[key] && CATEGORIES[key].question) || "";
+  switch (key) {
+    case "success":
+      return objective ? `For the objective of “${objective}”, what measurable result or acceptance threshold would confirm success?` : generic;
+    case "timeline":
+      return (deliverables || scope) ? `What timeline or milestones fit ${deliverables ? `the deliverables “${deliverables}”` : `the scope “${scope}”`}, including review and acceptance?` : generic;
+    case "outOfScope":
+      return scope ? `Given the scope “${scope}”, what is explicitly out of scope, and who remains responsible for the excluded work?` : generic;
+    case "deliverables":
+      return objective ? `For the objective of “${objective}”, which concrete deliverables are expected, and what defines ‘done’?` : generic;
+    case "scope":
+      return objective ? `For the objective of “${objective}”, what is included in scope, and what are the main activities?` : generic;
+    case "budget":
+      return (deliverables || scope) ? `What budget or workload is realistic for ${deliverables ? `“${deliverables}”` : `“${scope}”`}?` : generic;
+    case "stakeholders":
+      return objective ? `Who are the key stakeholders and the approval owner for “${objective}”?` : generic;
+    case "constraints": {
+      const depends = firstSummary(["dependencies", "tools", "documents", "stakeholders"], 14);
+      return depends ? `The assignment depends on ${depends}. Which assumptions, dependencies, or constraints must be confirmed, and by whom?` : generic;
+    }
+    default:
+      return generic;
+  }
+}
+/* Validation questions already cover these themes — skip duplicate gap asks. */
+const VALIDATION_COVERED = new Set(["timeline", "success", "acceptance", "outOfScope", "scope", "budget", "constraints", "dependencies", "stakeholders"]);
+
+/* ----- Normal User Flow only (Mode 1) -----
+ * In a rough idea, users often mention systems/ERP/payment/implementation as
+ * background, not as exclusions. Out-of-scope counts as an explicit boundary
+ * only with an explicit exclusion signal; otherwise we add ONE targeted
+ * follow-up question. This is gated to Mode 1 and changes no scoring, no
+ * warnings, and nothing in the Evaluation Flow. */
+const RAW_EXCLUSION_SIGNAL = /\b(out[-\s]?of[-\s]?scope|not in scope|not included|do(?:es)? not (?:want to )?(?:cover|include)|will not (?:include|cover)|exclud|not part of (?:this )?(?:assignment|engagement|project|scope)|outside (?:the |this )?(?:scope|engagement|project))\b/i;
+const RAW_BOUNDARY_TOPIC = /\b(erp|payment|implementation|integration|migration|training|maintenance|roll[-\s]?out|deployment|go[-\s]?live|operational|systems?)\b/i;
+
 function generateQuestions(level, completeness) {
   const questions = [];
   const seen = new Set();
-  const add = (text, source) => { const k = text.toLowerCase(); if (!seen.has(k)) { seen.add(k); questions.push({ text, source }); } };
+  const add = (text, source) => { const k = (text || "").toLowerCase().trim(); if (text && !seen.has(k)) { seen.add(k); questions.push({ text, source }); } };
   const gapKeys = new Set(completeness.gaps.map((g) => g.key));
 
   if (level === "low") {
+    // Exploratory stays generic framing — a rough idea has little to quote yet.
     EXPLORATORY_QUESTIONS.forEach((q) => add(q, "Exploratory"));
   } else if (level === "medium") {
-    completeness.categories.forEach((c) => { if (gapKeys.has(c.key)) add(CATEGORIES[c.key].question, "Targeted clarification"); });
+    completeness.categories.forEach((c) => { if (gapKeys.has(c.key)) add(contextualGapQuestion(c.key), "Targeted clarification"); });
   } else {
-    VALIDATION_QUESTIONS.forEach((q) => add(q, "Validation"));
-    completeness.categories.forEach((c) => { if (gapKeys.has(c.key) && CATEGORIES[c.key].weight >= 3) add(CATEGORIES[c.key].question, "Validation gap"); });
+    validationQuestions().forEach((q) => add(q, "Validation"));
+    completeness.categories.forEach((c) => {
+      if (gapKeys.has(c.key) && CATEGORIES[c.key].weight >= 3 && !VALIDATION_COVERED.has(c.key)) add(contextualGapQuestion(c.key), "Validation gap");
+    });
   }
   if (level !== "high") detectDomains().forEach((d) => d.questions.forEach((q) => add(q, d.key)));
+
+  // Mode-1 only: boundary topics mentioned in the background but never explicitly
+  // excluded → prompt for an explicit out-of-scope boundary (no scoring change).
+  if (currentMode === "raw") {
+    const oosText = state.outOfScope || "";
+    const bgText = [state.initialDescription, state.objective, state.problem, state.scope, state.includedActivities].join(" ");
+    const explicitlyExcluded = RAW_EXCLUSION_SIGNAL.test(oosText) || RAW_EXCLUSION_SIGNAL.test(bgText);
+    const mentionsBoundaryTopic = RAW_BOUNDARY_TOPIC.test(oosText) || RAW_BOUNDARY_TOPIC.test(bgText);
+    if (mentionsBoundaryTopic && !explicitlyExcluded) {
+      add("Which activities, systems, or implementation areas should be explicitly excluded from this assignment?", "Out-of-scope clarification");
+    }
+  }
   return questions;
 }
 
