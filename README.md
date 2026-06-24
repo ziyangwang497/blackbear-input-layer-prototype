@@ -68,12 +68,17 @@ Everything runs locally in the browser.
 The buttons at the top **only load fictional examples**; they do not let you pick a
 maturity level. They exist to illustrate how the same model behaves across maturities:
 
-| Demo case | Result | What it shows |
-|---|---|---|
-| Exploratory | Low maturity | Problem-framing questions; evaluated on context/objective/stakeholders/uncertainty |
-| Partially defined | Medium maturity | Targeted clarification questions; evaluated on scope/deliverables/timeline/etc. |
-| Well-defined | High maturity | Validation questions; evaluated on definition of done/acceptance/approval/etc. |
-| Inconsistent demo | Triggers warnings | Deliberately fires several consistency checks |
+| Demo case | Result | Out-of-scope | What it shows |
+|---|---|---|---|
+| Exploratory | Low maturity | Missing | Problem-framing questions; evaluated on context/objective/stakeholders/uncertainty |
+| Partially defined | Medium maturity | **Weak** | Targeted clarification questions; a short standalone exclusion stays Weak |
+| Well-defined | High maturity | **Strong** | Contextual validation questions; a deliberate boundary statement (what is covered + who remains responsible) is Strong |
+| Inconsistent demo | Triggers warnings | **Weak** | Fires several consistency checks; a thin "Training is out of scope." stays Weak |
+
+> **Out-of-scope is judged rigorously.** A short exclusion such as *"Payment execution and a
+> full ERP migration are out of scope."* is **Weak**, not Strong. Strong requires explicit
+> exclusion language **plus** a deliberate boundary — what the assignment does cover, or who
+> remains responsible — with enough detail (transparent local signals, not character count).
 
 You can also fill the Initial intake manually, press **Screen maturity & analyze**, then
 fill the maturity-specific follow-up fields and press **Update analysis** to refine.
@@ -113,6 +118,13 @@ The logic is organised into commented blocks:
   budget/workload, acceptance, validation, approval owner). Each category earns
   `weight × qualityFactor` (strong = 1, weak = 0.5, missing = 0); budget/workload is
   weighted moderately so a missing budget lowers the score realistically, not punitively.
+  **Out-of-scope** uses a dedicated rigorous rule (`outOfScopeStrength`) — shared by
+  maturity screening and completeness — so a thin standalone exclusion is only Weak and
+  cannot falsely raise maturity.
+- **Out-of-scope rigor** (section 2) – Strong out-of-scope needs explicit exclusion
+  language **and** a deliberate boundary (a contrast/ownership marker such as "limited to",
+  "remains the responsibility of", "not included in this engagement") **and** enough
+  concrete detail; otherwise it is Weak (or Missing when empty/placeholder).
 - **Consistency checks** (section 5) – independent rule-based contradiction checks: broad
   scope vs. short timeline; broad scope vs. limited budget; many deliverables / complex
   scope vs. missing resources/access; multi-country / multi-site / multi-region scope vs.
@@ -122,9 +134,13 @@ The logic is organised into commented blocks:
   objective; stakeholder missing although approval is required; included activities
   conflicting with out-of-scope; non-measurable success criteria; milestones without
   deliverables; role overload.
-- **Adaptive questions** (section 6) – Low → exploratory framing questions; Medium → one
-  targeted question per weak/missing required category; High → validation questions plus
-  clarifications for major gaps. Domain-specific questions are appended for Low/Medium.
+- **Adaptive questions** (section 6) – **contextual, rule-based** (no LLM): Medium and High
+  questions quote concise, safely-escaped summaries of the user's own input — e.g.
+  *"The package proposes '10 weeks…' for the deliverables '…'. Is this timeline sufficient…?"*
+  or *"For the objective of '…', what measurable result would confirm success?"* Low stays
+  generic framing (a rough idea has little to quote); a generic fallback is used when a
+  field is empty. The three paths (exploratory / medium / validation) and de-duplication
+  are preserved. Domain-specific questions are appended for Low/Medium.
 - **Structured input package** (section 7) – a seven-part hand-off: (1) detected maturity
   level, (2) reason for classification, (3) confirmed information, (4) missing or weak
   information, (5) adaptive follow-up questions, (6) consistency risks, (7) recommended

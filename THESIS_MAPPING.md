@@ -90,6 +90,12 @@ indicator).
   detail it could not reasonably have yet. **Budget/workload** is included in the
   Medium and High category sets (it is a first-class field in real intake) and is
   weighted moderately so a missing budget is realistic, not punitive.
+- **Out-of-scope rigor (`outOfScopeStrength`):** a bare exclusion is **not** Strong.
+  Strong requires explicit exclusion language **and** a deliberate boundary (a
+  contrast/ownership marker — "limited to", "remains the responsibility of", "not
+  included in this engagement") **and** enough concrete detail. The same rule feeds
+  maturity screening, so a thin out-of-scope cannot falsely raise maturity. Example:
+  *"Payment execution and a full ERP migration are out of scope."* → **Weak**.
 
 ### 2. Consistency
 - **Where:** `checkConsistency()` and the *Consistency warnings* list.
@@ -194,6 +200,12 @@ Counts all follow-up actions the prototype makes visible: **adaptive follow-up q
 (maturity-based diagnosis) + **category-specific follow-up questions** (taxonomy table) =
 **total** (exact duplicate questions counted once). Replaces the earlier Action Conversion
 Rate; it shows how the diagnosis turns into actionable guidance.
+
+The Medium and High follow-up questions are **contextual** (rule-based, no LLM): they quote
+concise, safely-escaped summaries of the user's own input — objective, scope, deliverables,
+timeline, budget/workload, out-of-scope, dependencies, etc. — instead of generic phrasing.
+Low maturity stays generic framing, a generic fallback is used when a field is empty, and
+duplicates are removed.
 
 ### Consistency / readiness risks (separate)
 Counted as warnings, never folded into completeness — e.g. broad scope vs. short timeline;

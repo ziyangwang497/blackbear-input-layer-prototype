@@ -66,6 +66,15 @@ This same field judgement is used by **both** the maturity indicators and the
 taxonomy scoring, so they stay consistent: a "Not clearly specified." field is
 *Missing* in both — it never becomes a strong maturity indicator.
 
+**Out-of-scope is judged more rigorously** (`outOfScopeStrength`). It is *not*
+Strong just because it contains one exclusion. Strong requires explicit exclusion
+language **and** a deliberate boundary — a contrast or ownership marker such as
+"limited to", "remains the responsibility of", or "not included in this
+engagement" — **and** enough concrete detail. So *"Payment execution and a full
+ERP migration are out of scope."* is **Weak**, while a statement that says what the
+assignment covers and who keeps the excluded work is **Strong**. The same rule
+feeds maturity, so a thin out-of-scope cannot falsely raise it.
+
 The prototype looks at **eight maturity indicators** (objective, scope,
 deliverable, timeline, resource, constraint, success-criteria, and stakeholder
 clarity); each indicator takes the **best quality** of the fields it maps to. It
@@ -144,9 +153,18 @@ The questions adapt to the maturity level and to the specific gaps:
   business problem are you trying to solve?", "Who will use the final output?").
 - **Medium maturity → targeted clarification questions** — one focused question
   for each required category that is still weak or missing.
-- **High maturity → validation questions** (for example "Are the success and
-  acceptance criteria measurable?"), plus a clarification for any high-weight
-  category that is still incomplete.
+- **High maturity → validation questions**, plus a clarification for any
+  high-weight category that is still incomplete.
+
+The Medium and High questions are now **contextual** (still rule-based, no LLM):
+they quote short, safely-escaped summaries of the user's own input rather than
+generic phrasing. For example, instead of *"Does the timeline match the
+deliverables?"* the prototype asks *"The package proposes '[timeline]' for the
+deliverables '[deliverables]'. Is this timeline sufficient, including review or
+acceptance activities?"*, and instead of *"Are the success criteria measurable?"*
+it asks *"For the objective of '[objective]', what measurable result would confirm
+success?"*. Low maturity keeps generic framing (a rough idea has little to quote),
+a generic fallback is used when a field is empty, and duplicates are removed.
 
 In addition, the prototype detects the assignment **domain** from keywords (for
 example market research, compliance/ESG, data migration, software, change
@@ -280,6 +298,13 @@ scoring = Chapter 6 evaluation.
 同一套字段判断同时用于**成熟度指标**和**分类法打分**，因此两者保持一致：一个
 "Not clearly specified." 字段在两者中都是*缺失*，绝不会成为"强"的成熟度指标。
 
+**范围外（out-of-scope）的判定更为严格**（`outOfScopeStrength`）。仅含一条排除项并不
+等于"强"。"强"要求：明确的排除用语 **加上** 一个有意的边界（对比或归属标记，如
+"limited to／remains the responsibility of／not included in this engagement）**以及**
+足够具体的细节。因此 *"Payment execution and a full ERP migration are out of scope."*
+为**薄弱**，而说明了任务涵盖什么、被排除的工作由谁负责的陈述才是**强**。该规则同样用于
+成熟度，因此单薄的范围外内容不会虚假地抬高成熟度。
+
 原型考察**八个成熟度指标**（目标、范围、交付物、时间线、资源、约束、成功标准、
 利益相关者的清晰度）；每个指标取其对应字段中**质量最高**的一个。原型统计有多少个
 指标为"强"，并应用三条透明规则：
@@ -345,8 +370,13 @@ scoring = Chapter 6 evaluation.
   成果？"）。
 - **中等成熟度 → 有针对性的澄清问题** —— 针对每个仍薄弱或缺失的必填类别提出一个
   聚焦问题。
-- **高成熟度 → 验证类问题**（例如"成功标准与验收标准是否可衡量？"），并对任何仍不
-  完整的高权重类别补充一个澄清问题。
+- **高成熟度 → 验证类问题**，并对任何仍不完整的高权重类别补充一个澄清问题。
+
+中、高成熟度的问题现在是**情境化的**（仍为基于规则、无 LLM）：它们会引用用户自己输入的
+简短、已安全转义的摘要，而非泛泛的措辞。例如，不再问"时间线与交付物是否匹配？"，而是问
+"该方案为交付物‘[deliverables]’安排了‘[timeline]’。考虑评审/验收活动，这个时间线是否
+充足？"；不再问"成功标准是否可衡量？"，而是问"针对目标‘[objective]’，什么可衡量的结果
+能确认成功？"。低成熟度保持泛化措辞；字段为空时使用通用回退；并去除重复问题。
 
 此外，原型会根据关键词识别任务**领域**（如市场研究、合规/ESG、数据迁移、软件、变革
 管理、招投标、认证），并为低/中成熟度任务追加几个领域专属问题。问题数量显示在指标
